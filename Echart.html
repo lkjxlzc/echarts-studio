@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studio V108 (Nuclear Animation Fix)</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+    <style>
+        /* --- 🍎 Apple Human Interface Guidelines 风格 --- */
+        :root {
+            --app-bg: #f5f5f7;
+            --surface: #ffffff;
+            --surface-elevated: #ffffff;
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --text-tertiary: #86868b;
+            --blue: #0071e3;
+            --blue-hover: #0077ed;
+            --blue-light: rgba(0, 113, 227, 0.12);
+            --green: #34c759;
+            --green-hover: #30d158;
+            --green-light: rgba(52, 199, 89, 0.12);
+            --red: #ff3b30;
+            --red-light: rgba(255, 59, 48, 0.12);
+            --fill-tertiary: rgba(120, 120, 128, 0.12);
+            --fill-secondary: rgba(120, 120, 128, 0.08);
+            --fill-primary: rgba(120, 120, 128, 0.18);
+            --separator: rgba(60, 60, 67, 0.12);
+            --radius-sm: 8px;
+            --radius: 10px;
+            --radius-lg: 12px;
+            --radius-pill: 980px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.1);
+            --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            outline: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            background: var(--app-bg);
+            color: var(--text-primary);
+            font-family: var(--font);
+            font-size: 15px;
+            line-height: 1.47;
+            overflow: hidden;
+        }
+
+        /* 侧边栏 - 白色卡片感 */
+        #sidebar {
+            width: 360px;
+            min-width: 300px;
+            background: var(--surface);
+            border-right: 1px solid var(--separator);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            padding: 24px 20px;
+            gap: 0;
+            box-shadow: 2px 0 16px rgba(0, 0, 0, 0.03);
+        }
+
+        #sidebar .sidebar-header {
+            flex-shrink: 0;
+            padding-bottom: 20px;
+            margin-bottom: 4px;
+            border-bottom: 1px solid var(--separator);
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            color: var(--text-primary);
+        }
+
+        h2 {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin: 0 0 12px 0;
+        }
+
+        .label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .control-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 18px 0;
+            border-bottom: 1px solid var(--separator);
+        }
+
+        .control-section:last-of-type {
+            border-bottom: none;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        /* 输入框 - Apple 风格圆角与填充 */
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 11px 14px;
+            background: var(--fill-secondary);
+            border: none;
+            border-radius: var(--radius);
+            color: var(--text-primary);
+            font-size: 15px;
+            font-family: inherit;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+
+        input:hover,
+        select:hover,
+        textarea:hover {
+            background: var(--fill-tertiary);
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            background: var(--surface);
+            box-shadow: 0 0 0 2px var(--blue);
+        }
+
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%236e6e73' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5' stroke='currentColor' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+
+        /* Range - 细滑轨 + 圆点 */
+        input[type="range"] {
+            -webkit-appearance: none;
+            height: 5px;
+            background: var(--fill-primary);
+            border-radius: var(--radius-pill);
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 2px solid var(--blue);
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+            transition: transform 0.15s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.08);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid var(--blue);
+            background: var(--surface);
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        .switch-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--blue);
+            cursor: pointer;
+        }
+
+        /* 主按钮 - 胶囊形蓝色 */
+        .btn-main {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            padding: 12px 20px;
+            border-radius: var(--radius-pill);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s, opacity 0.2s;
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .btn-main:hover {
+            background: var(--blue-hover);
+        }
+
+        .btn-main:active {
+            opacity: 0.88;
+        }
+
+        .btn-main.btn-success {
+            background: var(--green);
+        }
+
+        .btn-main.btn-success:hover {
+            background: var(--green-hover);
+        }
+
+        /* 次要按钮 - 浅灰填充 */
+        .btn-sec {
+            background: var(--fill-secondary);
+            color: var(--text-primary);
+            border: none;
+            padding: 10px 18px;
+            border-radius: var(--radius-pill);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.2s;
+            width: 100%;
+        }
+
+        .btn-sec:hover {
+            background: var(--fill-tertiary);
+        }
+
+        /* 代码区 - 深色编辑器 */
+        #code-area {
+            font-family: "SF Mono", "Menlo", "Monaco", Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: #1c1c1e;
+            color: #e5e5ea;
+            border: none;
+            border-radius: var(--radius-lg);
+            padding: 14px;
+            resize: none;
+            flex: 1;
+            min-height: 140px;
+            transition: box-shadow 0.2s;
+        }
+
+        #code-area:focus {
+            box-shadow: 0 0 0 2px var(--blue);
+        }
+
+        #code-area::placeholder {
+            color: #636366;
+        }
+
+        /* 预览区 - 柔和灰底 + 网格 */
+        #preview-stage {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: #e8e8ed;
+            background-image:
+                linear-gradient(45deg, #d1d1d6 25%, transparent 25%),
+                linear-gradient(-45deg, #d1d1d6 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #d1d1d6 75%),
+                linear-gradient(-45deg, transparent 75%, #d1d1d6 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 0, 10px -10px, 0 10px;
+            cursor: default;
+        }
+
+        #preview-stage:hover {
+            cursor: grab;
+        }
+
+        #chart-container:hover {
+            cursor: default;
+        }
+
+        #chart-container {
+            /* 尺寸由 JS 根据所选比例动态设置，此处仅作默认占位 */
+            min-width: 100px;
+            min-height: 100px;
+            background: var(--surface);
+            box-shadow: var(--shadow-lg);
+            border-radius: var(--radius-lg);
+            transform-origin: center center;
+            box-sizing: border-box;
+        }
+
+        /* 缩放工具栏 - 毛玻璃胶囊 */
+        #zoom-toolbar {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            padding: 6px 8px 6px 16px;
+            border-radius: var(--radius-pill);
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            z-index: 100;
+            border: 1px solid rgba(255, 255, 255, 0.6);
+        }
+
+        .zoom-btn {
+            background: transparent;
+            border: none;
+            font-size: 18px;
+            font-weight: 400;
+            cursor: pointer;
+            color: var(--text-primary);
+            width: 36px;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        .zoom-btn:hover {
+            background: rgba(0, 0, 0, 0.06);
+        }
+
+        #zoom-toolbar .zoom-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--separator);
+            margin: 0 6px;
+        }
+
+        #zoom-level {
+            font-size: 13px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            min-width: 44px;
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        /* 冻结标签 - 红色胶囊 */
+        #freeze-badge {
+            position: absolute;
+            top: 28px;
+            right: 28px;
+            background: var(--red);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: var(--radius-pill);
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 16px rgba(255, 59, 48, 0.35);
+            display: none;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        /* 弹窗 - 大圆角卡片 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(8px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-card {
+            background: var(--surface);
+            width: 400px;
+            max-width: 90vw;
+            padding: 32px 28px;
+            border-radius: 18px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .progress-bar {
+            height: 5px;
+            background: var(--fill-secondary);
+            border-radius: var(--radius-pill);
+            overflow: hidden;
+            margin: 24px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--blue);
+            transition: width 0.1s linear;
+            border-radius: var(--radius-pill);
+        }
+
+        /* 侧边栏滚动条 - 极细 */
+        .sidebar-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: var(--fill-primary);
+            border-radius: var(--radius-pill);
+        }
+
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover {
+            background: var(--text-tertiary);
+        }
+
+        #sidebar a {
+            color: var(--blue);
+            text-decoration: none;
+        }
+
+        #sidebar a:hover {
+            text-decoration: underline;
+        }
+
+        /* DeepSeek 弹窗 - 大尺寸 */
+        #deepseek-modal .modal-card {
+            width: 520px;
+            max-width: 92vw;
+            max-height: 88vh;
+            overflow-y: auto;
+            text-align: left;
+            padding: 24px;
+        }
+
+        #deepseek-modal .modal-card h1 {
+            font-size: 18px;
+            margin: 0 0 16px 0;
+            text-align: center;
+        }
+
+        #deepseek-modal .label {
+            margin-bottom: 6px;
+        }
+
+        #deepseek-modal textarea {
+            min-height: 80px;
+            font-family: "SF Mono", "Menlo", monospace;
+            font-size: 12px;
+        }
+
+        #deepseek-modal #deepseek-result {
+            min-height: 120px;
+            background: #1c1c1e;
+            color: #e5e5ea;
+        }
+
+        #deepseek-modal .deepseek-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            justify-content: flex-end;
+        }
+
+        #deepseek-modal .deepseek-status {
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+            min-height: 18px;
+        }
+
+        /* Chat message styles */
+        #deepseek-chat-area {
+            background: #fff;
+        }
+
+        .deepseek-chat-msg {
+            display: flex;
+            flex-direction: column;
+            padding: 8px 12px;
+            border-radius: 10px;
+            max-width: 78%;
+            word-break: break-word;
+        }
+
+        .deepseek-chat-msg.user {
+            align-self: flex-end;
+            background: linear-gradient(90deg, #e6f0ff, #d9e9ff);
+            color: #053a86;
+            text-align: right;
+        }
+
+        .deepseek-chat-msg.assistant {
+            align-self: flex-start;
+            background: #f6f7fb;
+            color: #111;
+            text-align: left;
+        }
+
+        .deepseek-chat-msg .meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-bottom: 6px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .deepseek-chat-msg .meta .role {
+            font-weight: 600;
+            font-size: 12px;
+            color: inherit;
+            opacity: 0.9;
+        }
+
+        .deepseek-chat-msg .content {
+            white-space: pre-wrap;
+            font-family: SF Mono, Menlo, monospace;
+            font-size: 13px;
+            color: inherit;
+        }
+
+        .deepseek-chat-msg .actions {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+        }
+
+        .deepseek-chat-msg .actions button {
+            padding: 6px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        #deepseek-modal .deepseek-tab.active {
+            background: var(--surface);
+            color: var(--blue);
+            font-weight: 600;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="freeze-badge">❄️ 标签已固定 (双击或右键解冻，截图会保留)</div>
+
+    <div id="zoom-toolbar">
+        <button class="zoom-btn" onclick="App.zoom(-0.1)" title="缩小">−</button>
+        <span id="zoom-level">45%</span>
+        <button class="zoom-btn" onclick="App.zoom(0.1)" title="放大">+</button>
+        <div class="zoom-divider"></div>
+        <button class="zoom-btn" onclick="App.autoFit()"
+            style="width:auto; padding:0 10px; font-size:12px; font-weight:600;">Fit</button>
+        <button class="zoom-btn" onclick="App.resetZoom()"
+            style="width:auto; padding:0 10px; font-size:12px; font-weight:600;">1:1</button>
+    </div>
+
+    <div id="render-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h1 style="font-size:18px; font-weight:700; margin:0 0 6px 0; letter-spacing:-0.02em;">正在导出 (V108)</h1>
+            <p id="render-status" style="color:var(--text-secondary); font-size:13px; margin:0 0 16px 0;">正在强制注入动画...
+            </p>
+            <div class="progress-bar">
+                <div id="export-fill" class="progress-fill"></div>
+            </div>
+            <div
+                style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-tertiary); font-weight:500; margin-bottom:10px;">
+                <span id="render-info">60 FPS</span>
+                <span id="render-pct">0%</span>
+            </div>
+            <!-- 时间信息行 -->
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; font-size:12px; font-weight:600; margin-bottom:16px; background:var(--fill-secondary); padding:8px 12px; border-radius:var(--radius-md);">
+                <span style="color:var(--text-secondary)">⏱ 已用时</span>
+                <span id="render-elapsed"
+                    style="color:var(--text-primary); font-family:monospace; font-size:14px;">00:00</span>
+                <span style="color:var(--text-tertiary)">|</span>
+                <span style="color:var(--text-secondary)">剩余</span>
+                <span id="render-eta" style="color:var(--blue); font-family:monospace; font-size:14px;">--:--</span>
+            </div>
+            <div
+                style="background:var(--blue-light); color:var(--blue); padding:14px 16px; border-radius:var(--radius-lg); font-size:13px; line-height:1.5; text-align:left; border:1px solid rgba(0,113,227,0.15);">
+                <b style="font-weight:600;">☢️ 核弹级动画修复</b><br>
+                1. 暴力递归注入 Animation 属性<br>
+                2. 8K 超采样 (4320×7560)<br>
+                3. 确保任何代码都能动！
+            </div>
+            <button class="btn-sec" onclick="App.stopExport()"
+                style="margin-top:20px; color:var(--red); font-weight:600;">取消</button>
+        </div>
+    </div>
+
+
+
+
+    <div id="sidebar">
+        <div class="sidebar-header">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <h1>Studio <span style="color:var(--blue)">V108</span></h1>
+                <span
+                    style="font-size:11px; font-weight:600; color:var(--text-tertiary); background:var(--fill-secondary); padding:6px 12px; border-radius:var(--radius-pill); letter-spacing:0.04em;">Final
+                    Fix</span>
+            </div>
+        </div>
+
+        <div style="overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 0; padding-right: 6px; margin: 0 -2px 0 0;"
+            class="sidebar-scroll">
+
+            <div class="control-section">
+                <h2>官网模板</h2>
+                <div class="row">
+                    <div class="col" style="flex:2">
+                        <label style="color:var(--text-tertiary)">可在官网浏览并复制示例到代码区</label>
+                    </div>
+                    <div class="col" style="text-align:right;">
+                        <a href="table.html" style="font-size:12px; color:var(--blue); text-decoration:none;">切换到表格模板页
+                            →</a>
+                    </div>
+                </div>
+                <a href="https://echarts.apache.org/examples/zh/index.html" target="_blank" rel="noopener"
+                    style="font-size:12px; color:var(--blue); margin-top:8px; display:inline-block;">在官网浏览更多示例 →</a>
+            </div>
+
+            <div class="control-section">
+                <div class="switch-row">
+                    <h2>标题设置</h2>
+                    <div style="display:flex; align-items:center; gap:6px;"><label
+                            style="margin:0; font-size:11px;">显示</label><input type="checkbox" id="title-show"
+                            onchange="App.runCode(false)"></div>
+                </div>
+                <div class="col"><label>标题文字 (同步文件名)</label><input type="text" id="title-text" value="2024 Q1 营收数据"
+                        oninput="App.onTitleChange(this.value)" style="font-weight:600; color:var(--blue);"></div>
+                <div class="row">
+                    <div class="col"><label>大小</label><input type="range" id="title-size" min="20" max="200" step="2"
+                            value="48" oninput="App.runCode(false)"></div>
+                    <div class="col"><label>垂直位置</label><input type="range" id="title-top" min="2" max="30" step="1"
+                            value="6" oninput="App.runCode(false)"></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h2>画布与动画</h2>
+                <div class="row">
+                    <div class="col" style="flex:2">
+                        <label>尺寸</label>
+                        <select id="canvas-preset" onchange="App.applyPreset()">
+                            <option value="1080,1890" selected>📱 8:14 竖屏（默认）</option>
+                            <option value="1080,1920">🎵 9:16 竖屏</option>
+                            <option value="1920,1080">📺 16:9 横屏</option>
+                            <option value="1080,1080">⬜ 1:1 正方形</option>
+                        </select>
+                    </div>
+                    <div class="col"><label>时长(s)</label><input type="number" id="anim-duration" value="1.0" step="0.5"
+                            onchange="App.runCode(false)"></div>
+                </div>
+                <div class="row">
+                    <div class="col"><label>速度曲线</label><select id="anim-easing" onchange="App.runCode(false)">
+                            <option value="cubicOut" selected>🍃 柔和减速</option>
+                            <option value="linear">➖ 线性匀速</option>
+                            <option value="quinticOut">🚀 极速冲刺</option>
+                            <option value="sineInOut">🦢 丝滑S型</option>
+                        </select></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h2>视觉缩放</h2>
+                <div class="row">
+                    <div class="col"><label>全局字号</label><input type="range" id="font-scale" min="0.5" max="4.0"
+                            step="0.1" value="1.0" oninput="App.updateScale()"></div>
+                    <div class="col"><label style="color:var(--blue)">标签大小</label><input type="range" id="tip-scale"
+                            min="0.5" max="4.0" step="0.1" value="1.0" oninput="App.updateScale()"></div>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <h2>导出与参数</h2>
+                <div class="col"><label class="label" style="margin-bottom:4px;">导出文件名（与标题同步）</label><input type="text"
+                        id="file-name" value="Chart_Export" oninput="App.syncTitleAndFileName(this.value, false)"
+                        style="font-weight:600; color:var(--text-primary); text-align:center;"></div>
+                <div class="row" style="margin-top:5px;">
+                    <div class="col"><select id="export-fps" onchange="App.updateExportBtnText()">
+                            <option value="60" selected>🚀 60 FPS (丝滑)</option>
+                            <option value="30">📺 30 FPS (标准)</option>
+                            <option value="24">🎞️ 24 FPS (电影)</option>
+                        </select></div>
+                    <div class="col"><button class="btn-sec" id="btn-capture" onclick="App.captureSmart()">📸 4K
+                            截图</button></div>
+                </div>
+                <div class="row"><button class="btn-main btn-success" id="btn-export"
+                        onclick="App.startCinemaExport()">📦 导出视频序列 (60帧)</button></div>
+            </div>
+
+            <div class="col" style="flex:1; gap:8px;">
+                <div class="row" style="justify-content:space-between; align-items:center; margin:0;">
+                    <h2>JavaScript</h2><a href="#" onclick="App.resetCode(); return false;"
+                        style="font-size:12px; font-weight:500;">清空</a>
+                </div>
+                <button class="btn-main" onclick="App.runCode(true)">▶ 运行代码 & 智能命名</button>
+                <textarea id="code-area" spellcheck="false"></textarea>
+                <div id="code-status"
+                    style="font-size:12px; color:var(--text-tertiary); min-height:18px; margin-top:4px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="preview-stage">
+        <div id="chart-container"></div>
+    </div>
+
+    <script>
+        window.App = {
+            chart: null, isExporting: false, isFrozen: false,
+            _lastHover: null,
+            state: { width: 1080, height: 1890, fontScale: 1.0, tipScale: 1.0, viewScale: 0.45, viewX: 0, viewY: 0 },
+
+            initChart() {
+                const dom = document.getElementById('chart-container');
+                if (!dom || typeof echarts === 'undefined') return;
+                this.chart = echarts.init(dom, null, { renderer: 'canvas', devicePixelRatio: 2 });
+                this.chart.on('mousemove', (params) => {
+                    if (params && params.componentType === 'series' && params.seriesIndex != null && params.dataIndex != null)
+                        this._lastHover = { seriesIndex: params.seriesIndex, dataIndex: params.dataIndex };
+                });
+            },
+
+            init() {
+                this.initChart();
+                const defaultCode = `option = {\n  xAxis: {\n    type: 'category',\n    data: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']\n  },\n  yAxis: {\n    type: 'value'\n  },\n  series: [\n    {\n      data: [120, 200, 150, 80, 70, 110, 130],\n      type: 'bar'\n    }\n  ]\n};`;
+                // 始终使用默认模板代码，方便预览
+                document.getElementById('code-area').value = defaultCode;
+                this.applyPreset(); this.updateExportBtnText(); this.initCanvasControl();
+                window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key === 'Enter') this.runCode(true); });
+
+                // 双击预览区域或图表容器，切换冻结 / 解冻画面（保留当前标签状态）
+                const chartContainer = document.getElementById('chart-container');
+                if (chartContainer) {
+                    chartContainer.addEventListener('dblclick', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.toggleFreeze();
+                    }, true);
+                }
+                const preview = document.getElementById('preview-stage');
+                if (preview) {
+                    preview.ondblclick = (e) => {
+                        // 只在点击空白预览区域时才触发，避免误触其它控件
+                        if (e.target === preview) {
+                            e.preventDefault();
+                            this.toggleFreeze();
+                        }
+                    };
+                }
+            },
+
+
+            _deepseekMode: 'common',
+
+            setDeepSeekMode(mode) {
+                this._deepseekMode = mode === 'custom' ? 'custom' : 'common';
+                const block = document.getElementById('deepseek-custom-template-block');
+                const tabCommon = document.getElementById('deepseek-tab-common');
+                const tabCustom = document.getElementById('deepseek-tab-custom');
+                if (block) block.style.display = this._deepseekMode === 'custom' ? 'block' : 'none';
+                if (tabCommon) tabCommon.classList.toggle('active', this._deepseekMode === 'common');
+                if (tabCustom) tabCustom.classList.toggle('active', this._deepseekMode === 'custom');
+            },
+
+            openDeepSeekModal() {
+                const modal = document.getElementById('deepseek-modal');
+                if (!modal) return;
+                modal.style.display = 'flex';
+                this.setDeepSeekMode(this._deepseekMode || 'common');
+                const key = sessionStorage.getItem('deepseek_api_key');
+                const keyEl = document.getElementById('deepseek-api-key');
+                if (keyEl && key) keyEl.value = key;
+                const resultEl = document.getElementById('deepseek-result');
+                const statusEl = document.getElementById('deepseek-status');
+                const applyBtn = document.getElementById('deepseek-apply-btn');
+                if (resultEl) resultEl.value = '';
+                if (statusEl) statusEl.textContent = '';
+                if (applyBtn) applyBtn.disabled = true;
+                this.clearDeepSeekImage();
+                const templateEl = document.getElementById('deepseek-template');
+                if (templateEl) {
+                    try {
+                        const saved = localStorage.getItem('deepseek_template_code');
+                        if (saved) templateEl.value = saved;
+                    } catch (e) { }
+                }
+                const imgInput = document.getElementById('deepseek-image');
+                if (imgInput && !imgInput._bound) {
+                    imgInput._bound = true;
+                    imgInput.addEventListener('change', () => {
+                        const nameEl = document.getElementById('deepseek-image-name');
+                        const clearBtn = document.getElementById('deepseek-image-clear');
+                        if (imgInput.files && imgInput.files[0]) {
+                            if (nameEl) nameEl.textContent = imgInput.files[0].name;
+                            if (clearBtn) clearBtn.style.display = 'inline-block';
+                        } else {
+                            if (nameEl) nameEl.textContent = '';
+                            if (clearBtn) clearBtn.style.display = 'none';
+                        }
+                    });
+                }
+            },
+
+            clearDeepSeekImage() {
+                const imgInput = document.getElementById('deepseek-image');
+                if (!imgInput) return;
+                imgInput.value = '';
+                const nameEl = document.getElementById('deepseek-image-name');
+                const clearBtn = document.getElementById('deepseek-image-clear');
+                if (nameEl) nameEl.textContent = '';
+                if (clearBtn) clearBtn.style.display = 'none';
+            },
+
+            /** 从 AI 返回文本中提取 option = { ... }; 支持嵌套大括号 */
+            extractOptionCode(text) {
+                if (!text || typeof text !== 'string') return '';
+                const start = text.search(/\boption\s*=\s*\{/);
+                if (start < 0) return '';
+                let i = text.indexOf('{', text.indexOf('=', start));
+                if (i < 0) return '';
+                let depth = 1;
+                for (i += 1; i < text.length && depth > 0; i++) {
+                    const c = text[i];
+                    if (c === '{') depth++;
+                    else if (c === '}') depth--;
+                }
+                let end = i;
+                while (end < text.length && (text[end] === ';' || /\s/.test(text[end]))) end++;
+                const code = text.slice(start, end).trim();
+                return code.endsWith(';') ? code : code + ';';
+            },
+
+            closeDeepSeekModal() {
+                const modal = document.getElementById('deepseek-modal');
+                if (modal) modal.style.display = 'none';
+            },
+
+            saveDeepSeekTemplate() {
+                const templateEl = document.getElementById('deepseek-template');
+                const statusEl = document.getElementById('deepseek-status');
+                if (!templateEl) return;
+                const code = templateEl.value.trim();
+                try {
+                    if (code) {
+                        localStorage.setItem('deepseek_template_code', code);
+                        if (statusEl) { statusEl.textContent = '模板已保存到本地'; statusEl.style.color = 'var(--green)'; }
+                    } else {
+                        localStorage.removeItem('deepseek_template_code');
+                        if (statusEl) { statusEl.textContent = '已清空保存的模板'; statusEl.style.color = 'var(--text-tertiary)'; }
+                    }
+                } catch (e) {
+                    if (statusEl) { statusEl.textContent = '保存失败: ' + (e.message || e); statusEl.style.color = 'var(--red)'; }
+                }
+            },
+
+            /* Chat UI helpers */
+            appendChatMessage(role, text) {
+                const wrap = document.getElementById('deepseek-chat-messages');
+                if (!wrap) return;
+                const el = document.createElement('div');
+                el.className = 'deepseek-chat-msg ' + (role === 'user' ? 'user' : (role === 'assistant' ? 'assistant' : ''));
+                el.setAttribute('data-role', role);
+
+                // meta (role + time)
+                const meta = document.createElement('div');
+                meta.className = 'meta';
+                const roleLabel = document.createElement('div');
+                roleLabel.className = 'role';
+                roleLabel.textContent = role === 'user' ? '你' : (role === 'assistant' ? 'AI' : role);
+                const timeLabel = document.createElement('div');
+                timeLabel.className = 'time';
+                const now = new Date();
+                timeLabel.textContent = now.toLocaleTimeString();
+                meta.appendChild(roleLabel);
+                meta.appendChild(timeLabel);
+                el.appendChild(meta);
+
+                // content
+                const content = document.createElement('div');
+                content.className = 'content';
+                content.textContent = text;
+                el.appendChild(content);
+
+                // actions for assistant messages
+                if (role === 'assistant') {
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+                    const applyBtn = document.createElement('button');
+                    applyBtn.className = 'btn-sec';
+                    applyBtn.textContent = '应用';
+                    applyBtn.onclick = () => this.applyAssistantText(text);
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'btn-sec';
+                    copyBtn.textContent = '复制';
+                    copyBtn.onclick = () => this.copyToClipboard(text);
+                    actions.appendChild(copyBtn);
+                    actions.appendChild(applyBtn);
+                    el.appendChild(actions);
+                }
+
+                wrap.appendChild(el);
+                // scroll to bottom
+                const area = document.getElementById('deepseek-chat-area');
+                if (area) area.scrollTop = area.scrollHeight;
+            },
+
+            insertTemplateToChat() {
+                const tpl = document.getElementById('deepseek-template');
+                const input = document.getElementById('deepseek-chat-input');
+                if (!tpl || !input) return;
+                const t = tpl.value || '';
+                if (!t) return;
+                input.value = (input.value ? input.value + '\\n\\n' : '') + t;
+                input.focus();
+            },
+
+            async sendChatMessage() {
+                const apiKey = document.getElementById('deepseek-api-key').value.trim();
+                const model = document.getElementById('deepseek-model').value || 'deepseek-chat';
+                const systemPrompt = document.getElementById('deepseek-system').value.trim();
+                const inputEl = document.getElementById('deepseek-chat-input');
+                const imageInput = document.getElementById('deepseek-image');
+                const statusEl = document.getElementById('deepseek-status');
+                if (!apiKey) { if (statusEl) { statusEl.textContent = '请先填写 API Key'; statusEl.style.color = 'var(--red)'; } return; }
+                const userText = inputEl && inputEl.value.trim();
+                const imageFile = imageInput && imageInput.files && imageInput.files[0];
+                if (!userText && !imageFile) { if (statusEl) { statusEl.textContent = '请输入内容或上传图片'; statusEl.style.color = 'var(--red)'; } return; }
+
+                // append user message
+                if (userText) this.appendChatMessage('user', userText);
+                inputEl.value = '';
+                if (statusEl) { statusEl.textContent = '正在请求 ' + model + '...'; statusEl.style.color = 'var(--text-secondary)'; }
+
+                let userContent;
+                if (imageFile) {
+                    const base64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = () => reject(new Error('图片读取失败'));
+                        reader.readAsDataURL(imageFile);
+                    });
+                    const mime = (imageFile.type || 'image/jpeg').toLowerCase();
+                    const dataUrl = base64.indexOf('base64,') >= 0 ? base64 : 'data:' + mime + ';base64,' + base64;
+                    userContent = [
+                        { type: 'text', text: userText || '' },
+                        { type: 'image_url', image_url: { url: dataUrl } }
+                    ];
+                } else {
+                    userContent = userText;
+                }
+
+                try {
+                    const res = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [
+                                ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+                                { role: 'user', content: userContent }
+                            ],
+                            max_tokens: 4096,
+                            temperature: 0.3
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.error) {
+                        if (statusEl) { statusEl.textContent = 'API 错误: ' + (data.error.message || JSON.stringify(data.error)); statusEl.style.color = 'var(--red)'; }
+                        return;
+                    }
+                    let text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+                    text = (text || '').trim();
+                    if (!text && data.choices && data.choices[0] && data.choices[0].text) text = data.choices[0].text.trim();
+                    if (!text) text = '[无返回内容]';
+                    this.appendChatMessage('assistant', text);
+                    if (statusEl) { statusEl.textContent = '已收到回复'; statusEl.style.color = 'var(--green)'; }
+                } catch (e) {
+                    if (statusEl) { statusEl.textContent = '请求失败: ' + (e.message || e); statusEl.style.color = 'var(--red)'; }
+                }
+            },
+
+            applyLastAssistantMessage() {
+                const wrap = document.getElementById('deepseek-chat-messages');
+                if (!wrap) return;
+                const children = Array.from(wrap.children).reverse();
+                const assistant = children.find(c => c.getAttribute('data-role') === 'assistant');
+                if (!assistant) return;
+                const text = assistant.innerText || assistant.textContent || '';
+                const extracted = this.extractOptionCode(text);
+                const codeToApply = extracted || text;
+                const codeArea = document.getElementById('code-area');
+                if (!codeArea) return;
+                codeArea.value = codeToApply;
+                this.runCode(true);
+                this.closeDeepSeekModal();
+            },
+
+            applyAssistantText(text) {
+                const extracted = this.extractOptionCode(text);
+                const codeToApply = extracted || text;
+                const codeArea = document.getElementById('code-area');
+                if (!codeArea) return;
+                codeArea.value = codeToApply;
+                this.runCode(true);
+                this.closeDeepSeekModal();
+            },
+
+            copyToClipboard(text) {
+                try {
+                    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text);
+                    } else {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                    const statusEl = document.getElementById('deepseek-status');
+                    if (statusEl) { statusEl.textContent = '已复制到剪贴板'; statusEl.style.color = 'var(--green)'; setTimeout(() => statusEl.textContent = '', 1200); }
+                } catch (e) {
+                    console.warn('复制失败', e);
+                }
+            },
+
+            clearChat() {
+                const wrap = document.getElementById('deepseek-chat-messages');
+                if (wrap) wrap.innerHTML = '';
+                const statusEl = document.getElementById('deepseek-status');
+                if (statusEl) statusEl.textContent = '';
+            },
+
+            openDeepSeekTemplates() {
+                const tpl = document.getElementById('deepseek-template');
+                if (tpl) tpl.focus();
+            },
+
+            async generateCodeWithDeepSeek() {
+                const apiKey = document.getElementById('deepseek-api-key').value.trim();
+                const userData = document.getElementById('deepseek-data').value.trim();
+                const chartType = document.getElementById('deepseek-chart-type').value;
+                const imageInput = document.getElementById('deepseek-image');
+                const imageFile = imageInput.files && imageInput.files[0];
+                const statusEl = document.getElementById('deepseek-status');
+                const resultEl = document.getElementById('deepseek-result');
+                const btn = document.getElementById('deepseek-generate-btn');
+                const applyBtn = document.getElementById('deepseek-apply-btn');
+
+                if (!apiKey) { statusEl.textContent = '请先填写 API Key'; statusEl.style.color = 'var(--red)'; return; }
+                const isCustomMode = this._deepseekMode === 'custom';
+                const hasTemplate = document.getElementById('deepseek-template').value.trim();
+                if (!userData && !imageFile && !(isCustomMode && hasTemplate)) { statusEl.textContent = '请填写数据、上传图片，或（自定义模式下）填写上方代码'; statusEl.style.color = 'var(--red)'; return; }
+
+                if (apiKey) sessionStorage.setItem('deepseek_api_key', apiKey);
+
+                btn.disabled = true;
+                applyBtn.disabled = true;
+                resultEl.value = '';
+                statusEl.textContent = imageFile ? '正在识别图片并生成代码...' : '正在请求 DeepSeek...';
+                statusEl.style.color = 'var(--text-secondary)';
+
+                const templateCode = document.getElementById('deepseek-template').value.trim();
+                const isCustom = this._deepseekMode === 'custom';
+
+                const systemPromptText = '你是一个 ECharts 图表配置专家。根据用户提供的数据和/或图片，只输出一段可运行的 JavaScript 代码，且必须满足：1) 代码中只定义一个变量 option，即 option = { ... }; 2) 使用 ECharts 5 的配置项，不要使用 echarts.init 等，只给 option 对象；3) 若用户提供的是图片，请识别图片中的图表类型、坐标轴、数据点或表格内容，并据此生成 option；4) 若用户数据是 CSV 或表格，请解析后填入 series.data 或 xAxis.data；5) 不要输出 markdown 代码块标记，只输出纯 JavaScript 的 option = { ... }; 一行或数行。若用户提供了模板代码，请在其基础上结合数据生成最终 option。';
+                let userContent;
+                if (imageFile) {
+                    const base64 = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = () => reject(new Error('图片读取失败'));
+                        reader.readAsDataURL(imageFile);
+                    });
+                    const mime = (imageFile.type || 'image/jpeg').toLowerCase();
+                    const dataUrl = base64.indexOf('base64,') >= 0 ? base64 : 'data:' + mime + ';base64,' + base64;
+                    let textPart = (chartType !== '自动识别' ? `目标图表类型：${chartType}。\n\n` : '');
+                    if (isCustom && templateCode) textPart += `【用户模板代码】\n${templateCode}\n\n`;
+                    textPart += (userData ? `用户补充数据或说明：\n${userData}\n\n` : '') +
+                        '请根据图片内容（及上述说明）生成 ECharts 的 option 代码（仅 option = { ... }; 形式）。';
+                    userContent = [
+                        { type: 'text', text: textPart },
+                        { type: 'image_url', image_url: { url: dataUrl } }
+                    ];
+                } else {
+                    if (isCustom && templateCode) {
+                        userContent = `目标图表类型：${chartType}。\n\n【用户模板代码（上方）】\n${templateCode}\n\n【用户数据（下方）】\n${userData}\n\n请将上方代码与下方数据合并，只输出最终可运行的 option = { ... }; 不要 markdown 标记。`;
+                    } else {
+                        userContent = `目标图表类型：${chartType}。\n\n用户数据：\n${userData}\n\n请根据以上数据生成 ECharts 的 option 代码（仅 option = { ... }; 形式）。`;
+                    }
+                }
+
+                try {
+                    const res = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [
+                                { role: 'system', content: systemPromptText },
+                                { role: 'user', content: userContent }
+                            ],
+                            max_tokens: 4096,
+                            temperature: 0.3
+                        })
+                    });
+                    const data = await res.json();
+                    if (data.error) {
+                        statusEl.textContent = 'API 错误: ' + (data.error.message || JSON.stringify(data.error));
+                        statusEl.style.color = 'var(--red)';
+                        return;
+                    }
+                    let text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+                    text = text.trim();
+                    const extracted = this.extractOptionCode(text);
+                    if (extracted) text = extracted;
+                    resultEl.value = text;
+                    applyBtn.disabled = !text;
+                    statusEl.textContent = '生成完成，可点击「应用到编辑器」';
+                    statusEl.style.color = 'var(--green)';
+                } catch (e) {
+                    statusEl.textContent = '请求失败: ' + (e.message || e);
+                    statusEl.style.color = 'var(--red)';
+                } finally {
+                    btn.disabled = false;
+                }
+            },
+
+            applyGeneratedCode() {
+                const resultEl = document.getElementById('deepseek-result');
+                const codeArea = document.getElementById('code-area');
+                if (!resultEl || !codeArea) return;
+                const code = resultEl.value.trim();
+                if (!code) return;
+                codeArea.value = code;
+                this.runCode(true);
+                this.closeDeepSeekModal();
+            },
+
+            initCanvasControl() {
+                const stage = document.getElementById('preview-stage');
+                stage.addEventListener('wheel', (e) => { if (true) { e.preventDefault(); const delta = e.deltaY > 0 ? -0.05 : 0.05; this.zoom(delta); } }, { passive: false });
+                let isDragging = false, startX, startY, isSpacePressed = false;
+                window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') { isSpacePressed = true; stage.style.cursor = 'grab'; document.getElementById('chart-container').style.pointerEvents = 'none'; } });
+                window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; stage.style.cursor = 'default'; document.getElementById('chart-container').style.pointerEvents = 'auto'; } });
+                stage.addEventListener('mousedown', (e) => { const canDrag = e.button === 1 || (e.button === 0 && isSpacePressed) || (e.button === 0 && e.target === stage); if (canDrag) { isDragging = true; startX = e.clientX - this.state.viewX; startY = e.clientY - this.state.viewY; stage.style.cursor = 'grabbing'; e.preventDefault(); } });
+                window.addEventListener('mousemove', (e) => { if (!isDragging) return; e.preventDefault(); this.state.viewX = e.clientX - startX; this.state.viewY = e.clientY - startY; this.updateTransform(); });
+                window.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; stage.style.cursor = isSpacePressed ? 'grab' : 'default'; } });
+            },
+            zoom(delta) { let newScale = this.state.viewScale + delta; if (newScale < 0.05) newScale = 0.05; if (newScale > 5) newScale = 5; this.state.viewScale = newScale; this.updateTransform(); },
+            resetZoom() { this.state.viewScale = 1; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            autoFit() { const wrap = document.getElementById('preview-stage'); const scale = Math.min((wrap.clientWidth - 80) / this.state.width, (wrap.clientHeight - 80) / this.state.height); this.state.viewScale = scale; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            updateTransform() { const dom = document.getElementById('chart-container'); dom.style.transform = `translate(${this.state.viewX}px, ${this.state.viewY}px) scale(${this.state.viewScale})`; document.getElementById('zoom-level').innerText = Math.round(this.state.viewScale * 100) + '%'; },
+            updateExportBtnText() { const fps = document.getElementById('export-fps').value; document.getElementById('btn-export').innerText = `📦 导出视频序列 (${fps}帧)`; },
+            onTitleChange(val) { this.syncTitleAndFileName(val, true); this.runCode(false); },
+            /** 同步标题与导出名：source 为当前值，fromTitle 为 true 表示来源是标题框（导出名用 sanitize），false 表示来源是导出名框（标题跟从，导出名不改写） */
+            syncTitleAndFileName(source, fromTitle) {
+                const titleEl = document.getElementById('title-text');
+                const fileEl = document.getElementById('file-name');
+                if (!titleEl || !fileEl) return;
+                if (this._syncingTitleFile) return;
+                this._syncingTitleFile = true;
+                const safe = (s) => (s || '').replace(/[\\/:*?"<>|]/g, '_').trim() || 'Chart_Export';
+                if (fromTitle) {
+                    const safeName = safe(source);
+                    fileEl.value = safeName;
+                    titleEl.value = source == null ? '' : (source || '');
+                } else {
+                    const v = source == null ? '' : (source || '');
+                    titleEl.value = v;
+                }
+                this._syncingTitleFile = false;
+            },
+            updateFileName(name) { this.syncTitleAndFileName(name, true); },
+            /** 根据 series 类型推断 tooltip.trigger：饼图/仪表盘等用 item，否则用 axis */
+            inferTooltipTrigger(option) {
+                const series = option.series;
+                if (!series || !Array.isArray(series) || series.length === 0) return 'axis';
+                const types = series.map(s => (s && s.type) ? s.type : '');
+                const needItem = ['pie', 'gauge', 'funnel', 'sankey', 'tree', 'treemap', 'sunburst', 'graph', 'lines', 'map'].some(t => types.includes(t));
+                if (needItem) return 'item';
+                const allScatter = types.every(t => t === 'scatter' || t === 'effectScatter');
+                const hasCategoryAxis = [].concat(option.xAxis || []).some(ax => ax && ax.type === 'category');
+                if (allScatter && !hasCategoryAxis) return 'item';
+                return 'axis';
+            },
+            getExportFileName() {
+                const fileEl = document.getElementById('file-name');
+                const raw = (fileEl && fileEl.value) ? fileEl.value.trim() : '';
+                return raw.replace(/[\\/:*?"<>|]/g, '_').trim() || 'Chart_Export';
+            },
+
+            // --- V108: 核弹级递归注入 ---
+            forceAnimation(obj, duration, easing) {
+                if (typeof obj !== 'object' || obj === null) return;
+                // 1. 强制开启
+                obj.animation = true;
+                // 2. 强制时长
+                obj.animationDuration = duration;
+                obj.animationDurationUpdate = duration;
+                // 3. 强制缓动
+                if (easing) {
+                    obj.animationEasing = easing;
+                    obj.animationEasingUpdate = easing;
+                }
+                // 4. 递归 (击穿所有 series, graphic, dataset)
+                for (let key in obj) {
+                    if (typeof obj[key] === 'object') this.forceAnimation(obj[key], duration, easing);
+                }
+            },
+
+            runCode: function (isFullReset = false, slowFactor = 1) {
+                const codeEl = document.getElementById('code-area');
+                if (!codeEl || !this.chart) return;
+                try {
+                    const code = codeEl.value;
+                    if (typeof localStorage !== 'undefined') localStorage.setItem('echarts_shared_code', code);
+                    if (!code || !code.trim()) return;
+                    let option;
+                    const func = new Function(`
+                        var option; 
+                        ${code}
+                        return option;
+                    `);
+                    option = func();
+                    if (!option || typeof option !== 'object') {
+                        console.warn('runCode: option 未定义或非对象');
+                        return;
+                    }
+
+                    if (isFullReset) {
+                        let autoName = "Chart_Export";
+                        if (option.title && option.title.text) autoName = option.title.text;
+                        else if (option.series && option.series[0] && option.series[0].name) autoName = option.series[0].name;
+                        this.syncTitleAndFileName(autoName, true);
+                    }
+
+                    if (!option.backgroundColor || option.backgroundColor === 'auto') { option.backgroundColor = '#ffffff'; }
+
+                    const userDur = parseFloat(document.getElementById('anim-duration').value) * 1000;
+                    const realDur = userDur * slowFactor;
+                    const ease = document.getElementById('anim-easing').value;
+
+                    // V108: 调用核弹注入
+                    // 如果是慢放模式 (导出中)，则强力覆盖所有动画参数
+                    if (slowFactor > 1) {
+                        this.forceAnimation(option, realDur, ease);
+                    } else {
+                        // 普通模式，只覆盖顶层，允许用户代码内部自由发挥
+                        option.animationDuration = realDur;
+                        option.animationEasing = ease;
+                        if (option.series) option.series.forEach(s => { s.animationDuration = realDur; s.animationEasing = ease; });
+                    }
+
+                    this.deepScale(option);
+                    this.applyGlobalFontScale(option);
+
+                    if (!option.title) option.title = {};
+                    const showTitle = document.getElementById('title-show').checked;
+                    option.title.show = showTitle;
+
+                    if (showTitle) {
+                        const titleText = document.getElementById('title-text').value;
+                        if (titleText) option.title.text = titleText;
+                        const titleSize = parseInt(document.getElementById('title-size').value);
+                        if (!option.title.textStyle) option.title.textStyle = {};
+                        option.title.textStyle.fontSize = titleSize;
+                        const titleTop = document.getElementById('title-top').value;
+                        option.title.top = titleTop + '%';
+                        option.title.left = 'center';
+                    }
+
+                    // 始终保证悬停有提示：用户未配置时给默认 tooltip，并优化显示稳定性
+                    if (!option.tooltip) option.tooltip = {};
+                    if (!option.tooltip.textStyle) option.tooltip.textStyle = {};
+                    let base = option.tooltip.textStyle.fontSize || 28;
+                    option.tooltip.textStyle.fontSize = Math.max(14, Math.round(base * this.state.tipScale));
+                    option.tooltip.confine = true;
+                    option.tooltip.appendToBody = false;
+                    option.tooltip.show = true;
+                    option.tooltip.triggerDelay = 0;
+                    option.tooltip.transitionDuration = 0.15;
+                    option.tooltip.hideDelay = 100;
+                    option.tooltip.enterable = true;
+                    if (this.isFrozen) { option.tooltip.alwaysShowContent = true; option.tooltip.triggerOn = 'none'; }
+                    else { option.tooltip.alwaysShowContent = false; option.tooltip.triggerOn = 'mousemove|click'; }
+                    if (option.tooltip.trigger == null || option.tooltip.trigger === undefined)
+                        option.tooltip.trigger = this.inferTooltipTrigger(option);
+                    if (option.tooltip.trigger === 'axis') {
+                        if (!option.tooltip.axisPointer) option.tooltip.axisPointer = {};
+                        if (option.tooltip.axisPointer.show === undefined) option.tooltip.axisPointer.show = true;
+                    }
+
+                    if (isFullReset) this.chart.clear();
+                    this.chart.setOption(option, { notMerge: isFullReset });
+
+                    const statusEl = document.getElementById('code-status');
+                    if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
+                } catch (e) {
+                    console.error(e);
+                    const statusEl = document.getElementById('code-status');
+                    if (statusEl) {
+                        statusEl.textContent = '运行失败: ' + (e && e.message ? e.message : String(e));
+                        statusEl.style.color = 'var(--red)';
+                    }
+                }
+            },
+
+            async captureSmart() {
+                const btn = document.getElementById('btn-capture') || document.querySelector('button[onclick*="captureSmart"]');
+                const old = btn.innerText; btn.innerText = "4K 截图中..."; btn.disabled = true;
+                await new Promise(r => setTimeout(r, 100));
+                const fileName = this.getExportFileName();
+                const dom = document.getElementById('chart-container');
+                const currentOpt = this.chart.getOption();
+                const bg = currentOpt.backgroundColor && currentOpt.backgroundColor !== 'auto' ? currentOpt.backgroundColor : '#ffffff';
+                try {
+                    if (this.isFrozen) {
+                        // 标签已固定时：用 html2canvas 截整个容器，才能包含 tooltip 层
+                        const savedTransform = dom.style.transform;
+                        const savedPosition = dom.style.position;
+                        const savedLeft = dom.style.left;
+                        const savedTop = dom.style.top;
+                        const savedZIndex = dom.style.zIndex;
+                        dom.style.transform = 'none';
+                        dom.style.position = 'fixed';
+                        dom.style.left = '-99999px';
+                        dom.style.top = '0';
+                        dom.style.zIndex = '99999';
+                        await new Promise(r => requestAnimationFrame(r));
+                        const canvas = await html2canvas(dom, {
+                            scale: 2, backgroundColor: bg, logging: false, useCORS: true,
+                            width: this.state.width, height: this.state.height
+                        });
+                        dom.style.transform = savedTransform;
+                        dom.style.position = savedPosition;
+                        dom.style.left = savedLeft;
+                        dom.style.top = savedTop;
+                        dom.style.zIndex = savedZIndex;
+                        canvas.toBlob(blob => saveAs(blob, `${fileName}.png`));
+                    } else {
+                        const dataUrl = this.chart.getDataURL({
+                            type: 'png', pixelRatio: 2, backgroundColor: bg, excludeComponents: ['toolbox']
+                        });
+                        const base64 = dataUrl.split(',')[1];
+                        const bin = atob(base64);
+                        const arr = new Uint8Array(bin.length);
+                        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                        const blob = new Blob([arr], { type: 'image/png' });
+                        saveAs(blob, `${fileName}.png`);
+                    }
+                } catch (e) { alert("截图失败：" + (e && e.message ? e.message : e)); }
+                btn.innerText = old; btn.disabled = false;
+            },
+
+            // exportLabelImage 功能已移除
+
+            async startCinemaExport() {
+                if (this.isExporting) return;
+                this.isExporting = true;
+                document.getElementById('render-modal').style.display = 'flex';
+                document.getElementById('export-fill').style.width = '0%';
+                document.getElementById('render-elapsed').textContent = '00:00';
+                document.getElementById('render-eta').textContent = '--:--';
+
+                const userSeconds = parseFloat(document.getElementById('anim-duration').value);
+                const fps = parseInt(document.getElementById('export-fps').value) || 60;
+                const totalFrames = Math.ceil(userSeconds * fps);
+                const SLOW_FACTOR = 20;
+                const captureInterval = (1000 / fps) * SLOW_FACTOR;
+
+                const zip = new JSZip();
+                const fileName = this.getExportFileName();
+                const folder = zip.folder(fileName);
+
+                // ── 计时器（每秒更新一次已用时 + ETA）──
+                const exportStartTime = Date.now();
+                const fmtTime = (ms) => {
+                    const s = Math.round(ms / 1000);
+                    const m = Math.floor(s / 60);
+                    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+                };
+                this._exportTimerInterval = setInterval(() => {
+                    if (!this.isExporting) return;
+                    const elapsed = Date.now() - exportStartTime;
+                    document.getElementById('render-elapsed').textContent = fmtTime(elapsed);
+                    // ETA：基于当前进度推算剩余时间
+                    const fillEl = document.getElementById('export-fill');
+                    const pctStr = fillEl ? parseFloat(fillEl.style.width) : 0;
+                    const pct = isNaN(pctStr) ? 0 : pctStr;
+                    if (pct > 0) {
+                        const totalEstMs = elapsed / (pct / 100);
+                        const remaining = Math.max(0, totalEstMs - elapsed);
+                        document.getElementById('render-eta').textContent = fmtTime(remaining);
+                    }
+                }, 1000);
+
+                // V108: 录制前序：清空 -> 等待 -> 启动 -> 等待
+                this.chart.clear();
+                await new Promise(r => setTimeout(r, 200)); // 确保清空生效
+
+                // 启动慢放 (带递归注入)
+                this.runCode(true, SLOW_FACTOR);
+
+                // 等待第一帧渲染完成 (非常重要，否则第一张是白的)
+                await new Promise(r => setTimeout(r, 100));
+
+                let frame = 0;
+                const timer = setInterval(() => {
+                    if (!this.isExporting) { clearInterval(timer); return; }
+                    frame++;
+
+                    try {
+                        const currentOpt = this.chart.getOption();
+                        const bg = currentOpt.backgroundColor && currentOpt.backgroundColor !== 'auto' ? currentOpt.backgroundColor : '#ffffff';
+
+                        // 4K 导出（与截图一致）
+                        const dataUrl = this.chart.getDataURL({
+                            type: 'png', pixelRatio: 2, backgroundColor: bg, excludeComponents: ['toolbox']
+                        });
+                        folder.file(`${fileName}_frame_${String(frame).padStart(4, '0')}.png`, dataUrl.split(',')[1], { base64: true });
+
+                        const pct = Math.round((frame / totalFrames) * 100);
+                        document.getElementById('export-fill').style.width = pct + '%';
+                        document.getElementById('render-info').innerText = `${frame}/${totalFrames}`;
+                        document.getElementById('render-pct').innerText = pct + '%';
+
+                        if (frame >= totalFrames) {
+                            clearInterval(timer);
+                            clearInterval(this._exportTimerInterval);
+                            // 显示最终已用时
+                            const totalElapsed = Date.now() - exportStartTime;
+                            document.getElementById('render-elapsed').textContent = fmtTime(totalElapsed);
+                            document.getElementById('render-eta').textContent = '完成 ✅';
+                            this.runCode(true, 1);
+                            zip.generateAsync({ type: "blob" }).then(c => {
+                                saveAs(c, `${fileName}_${fps}fps.zip`);
+                                setTimeout(() => { document.getElementById('render-modal').style.display = 'none'; this.isExporting = false; }, 1000);
+                            });
+                        }
+                    } catch (e) { }
+                }, captureInterval);
+            },
+
+            applyPreset() {
+                const presetEl = document.getElementById('canvas-preset');
+                if (!presetEl) return;
+                const val = presetEl.value.split(',');
+                const w = parseInt(val[0], 10);
+                const h = parseInt(val[1], 10);
+                if (!isNaN(w) && !isNaN(h)) {
+                    this.state.width = w;
+                    this.state.height = h;
+                }
+                const dom = document.getElementById('chart-container');
+                if (dom) {
+                    dom.style.width = this.state.width + 'px';
+                    dom.style.height = this.state.height + 'px';
+                }
+                if (this.chart) this.chart.resize({ width: this.state.width, height: this.state.height });
+                this.autoFit();
+                this.runCode(true);
+            },
+            toggleFreeze() { this.isFrozen = !this.isFrozen; const badge = document.getElementById('freeze-badge'); if (this.isFrozen) badge.style.display = 'block'; else { badge.style.display = 'none'; this.chart.dispatchAction({ type: 'hideTip' }); } this.runCode(false); },
+            autoFit() { const wrap = document.getElementById('preview-stage'); const scale = Math.min((wrap.clientWidth - 80) / this.state.width, (wrap.clientHeight - 80) / this.state.height); this.state.viewScale = scale; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            updateScale() { this.state.fontScale = parseFloat(document.getElementById('font-scale').value); this.state.tipScale = parseFloat(document.getElementById('tip-scale').value); this.runCode(false); },
+            deepScale(obj) {
+                if (!obj || typeof obj !== 'object') return;
+                for (let key in obj) {
+                    if (key === 'tooltip' || key === 'title' || key === 'xAxis' || key === 'yAxis' || key === 'legend') continue;
+                    if (key === 'fontSize' && typeof obj[key] === 'number') obj[key] = Math.round(obj[key] * this.state.fontScale);
+                    else if (typeof obj[key] === 'object') this.deepScale(obj[key]);
+                }
+            },
+            applyGlobalFontScale(option) {
+                const s = this.state.fontScale;
+                const D = 14;
+                const setAxis = (ax) => {
+                    if (!ax) return;
+                    if (!ax.axisLabel) ax.axisLabel = {};
+                    const cur = ax.axisLabel.fontSize;
+                    ax.axisLabel.fontSize = typeof cur === 'number' ? Math.round(cur * s) : Math.round(D * s);
+                };
+                [].concat(option.xAxis || []).forEach(setAxis);
+                [].concat(option.yAxis || []).forEach(setAxis);
+                if (option.legend) {
+                    if (!option.legend.textStyle) option.legend.textStyle = {};
+                    const cur = option.legend.textStyle.fontSize;
+                    option.legend.textStyle.fontSize = typeof cur === 'number' ? Math.round(cur * s) : Math.round(D * s);
+                }
+                if (option.series && Array.isArray(option.series)) {
+                    option.series.forEach(ser => {
+                        if (ser.label && ser.label.fontSize != null) ser.label.fontSize = Math.round(Number(ser.label.fontSize) * s);
+                    });
+                }
+            },
+            stopExport() {
+                this.isExporting = false;
+                clearInterval(this._exportTimerInterval);
+                document.getElementById('render-modal').style.display = 'none';
+                this.runCode(true, 1);
+            },
+            resetCode() { document.getElementById('code-area').value = ''; }
+        };
+
+        window.onload = () => App.init();
+    </script>
+</body>
+
+</html>
