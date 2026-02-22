@@ -173,6 +173,7 @@
         /* Range - 细滑轨 + 圆点 */
         input[type="range"] {
             -webkit-appearance: none;
+            appearance: none;
             height: 5px;
             background: var(--fill-primary);
             border-radius: var(--radius-pill);
@@ -515,10 +516,6 @@
             min-height: 18px;
         }
 
-        /* Chat message styles */
-        #deepseek-chat-area {
-            background: #fff;
-        }
 
         .deepseek-chat-msg {
             display: flex;
@@ -884,6 +881,21 @@
                 return code.endsWith(';') ? code : code + ';';
             },
 
+            /** 将文件读取为 DataURL（Promise 封装）*/
+            readFileAsDataURL(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const result = reader.result;
+                        const mime = (file.type || 'image/jpeg').toLowerCase();
+                        const dataUrl = result.indexOf('base64,') >= 0 ? result : 'data:' + mime + ';base64,' + result;
+                        resolve(dataUrl);
+                    };
+                    reader.onerror = () => reject(new Error('图片读取失败'));
+                    reader.readAsDataURL(file);
+                });
+            },
+
             closeDeepSeekModal() {
                 const modal = document.getElementById('deepseek-modal');
                 if (modal) modal.style.display = 'none';
@@ -987,14 +999,7 @@
 
                 let userContent;
                 if (imageFile) {
-                    const base64 = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = () => reject(new Error('图片读取失败'));
-                        reader.readAsDataURL(imageFile);
-                    });
-                    const mime = (imageFile.type || 'image/jpeg').toLowerCase();
-                    const dataUrl = base64.indexOf('base64,') >= 0 ? base64 : 'data:' + mime + ';base64,' + base64;
+                    const dataUrl = await this.readFileAsDataURL(imageFile);
                     userContent = [
                         { type: 'text', text: userText || '' },
                         { type: 'image_url', image_url: { url: dataUrl } }
@@ -1022,9 +1027,8 @@
                         if (statusEl) { statusEl.textContent = 'API 错误: ' + (data.error.message || JSON.stringify(data.error)); statusEl.style.color = 'var(--red)'; }
                         return;
                     }
-                    let text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
-                    text = (text || '').trim();
-                    if (!text && data.choices && data.choices[0] && data.choices[0].text) text = data.choices[0].text.trim();
+                    let text = (data.choices?.[0]?.message?.content || '').trim();
+                    if (!text) text = (data.choices?.[0]?.text || '').trim();
                     if (!text) text = '[无返回内容]';
                     this.appendChatMessage('assistant', text);
                     if (statusEl) { statusEl.textContent = '已收到回复'; statusEl.style.color = 'var(--green)'; }
@@ -1120,14 +1124,7 @@
                 const systemPromptText = '你是一个 ECharts 图表配置专家。根据用户提供的数据和/或图片，只输出一段可运行的 JavaScript 代码，且必须满足：1) 代码中只定义一个变量 option，即 option = { ... }; 2) 使用 ECharts 5 的配置项，不要使用 echarts.init 等，只给 option 对象；3) 若用户提供的是图片，请识别图片中的图表类型、坐标轴、数据点或表格内容，并据此生成 option；4) 若用户数据是 CSV 或表格，请解析后填入 series.data 或 xAxis.data；5) 不要输出 markdown 代码块标记，只输出纯 JavaScript 的 option = { ... }; 一行或数行。若用户提供了模板代码，请在其基础上结合数据生成最终 option。';
                 let userContent;
                 if (imageFile) {
-                    const base64 = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = () => reject(new Error('图片读取失败'));
-                        reader.readAsDataURL(imageFile);
-                    });
-                    const mime = (imageFile.type || 'image/jpeg').toLowerCase();
-                    const dataUrl = base64.indexOf('base64,') >= 0 ? base64 : 'data:' + mime + ';base64,' + base64;
+                    const dataUrl = await this.readFileAsDataURL(imageFile);
                     let textPart = (chartType !== '自动识别' ? `目标图表类型：${chartType}。\n\n` : '');
                     if (isCustom && templateCode) textPart += `【用户模板代码】\n${templateCode}\n\n`;
                     textPart += (userData ? `用户补充数据或说明：\n${userData}\n\n` : '') +
@@ -1164,7 +1161,7 @@
                         statusEl.style.color = 'var(--red)';
                         return;
                     }
-                    let text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+                    let text = (data.choices?.[0]?.message?.content || '');
                     text = text.trim();
                     const extracted = this.extractOptionCode(text);
                     if (extracted) text = extracted;
@@ -1193,19 +1190,97 @@
 
             initCanvasControl() {
                 const stage = document.getElementById('preview-stage');
-                stage.addEventListener('wheel', (e) => { if (true) { e.preventDefault(); const delta = e.deltaY > 0 ? -0.05 : 0.05; this.zoom(delta); } }, { passive: false });
+                const chartDom = document.getElementById('chart-container');
                 let isDragging = false, startX, startY, isSpacePressed = false;
-                window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') { isSpacePressed = true; stage.style.cursor = 'grab'; document.getElementById('chart-container').style.pointerEvents = 'none'; } });
-                window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; stage.style.cursor = 'default'; document.getElementById('chart-container').style.pointerEvents = 'auto'; } });
-                stage.addEventListener('mousedown', (e) => { const canDrag = e.button === 1 || (e.button === 0 && isSpacePressed) || (e.button === 0 && e.target === stage); if (canDrag) { isDragging = true; startX = e.clientX - this.state.viewX; startY = e.clientY - this.state.viewY; stage.style.cursor = 'grabbing'; e.preventDefault(); } });
-                window.addEventListener('mousemove', (e) => { if (!isDragging) return; e.preventDefault(); this.state.viewX = e.clientX - startX; this.state.viewY = e.clientY - startY; this.updateTransform(); });
-                window.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; stage.style.cursor = isSpacePressed ? 'grab' : 'default'; } });
+
+                stage.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                    this.zoom(delta);
+                }, { passive: false });
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && !e.repeat
+                        && document.activeElement.tagName !== 'TEXTAREA'
+                        && document.activeElement.tagName !== 'INPUT') {
+                        isSpacePressed = true;
+                        stage.style.cursor = 'grab';
+                        chartDom.style.pointerEvents = 'none';
+                    }
+                });
+
+                window.addEventListener('keyup', (e) => {
+                    if (e.code === 'Space') {
+                        isSpacePressed = false;
+                        stage.style.cursor = 'default';
+                        chartDom.style.pointerEvents = 'auto';
+                    }
+                });
+
+                stage.addEventListener('mousedown', (e) => {
+                    const canDrag = e.button === 1
+                        || (e.button === 0 && isSpacePressed)
+                        || (e.button === 0 && e.target === stage);
+                    if (canDrag) {
+                        isDragging = true;
+                        startX = e.clientX - this.state.viewX;
+                        startY = e.clientY - this.state.viewY;
+                        stage.style.cursor = 'grabbing';
+                        e.preventDefault();
+                    }
+                });
+
+                window.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    this.state.viewX = e.clientX - startX;
+                    this.state.viewY = e.clientY - startY;
+                    this.updateTransform();
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        stage.style.cursor = isSpacePressed ? 'grab' : 'default';
+                    }
+                });
             },
-            zoom(delta) { let newScale = this.state.viewScale + delta; if (newScale < 0.05) newScale = 0.05; if (newScale > 5) newScale = 5; this.state.viewScale = newScale; this.updateTransform(); },
-            resetZoom() { this.state.viewScale = 1; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
-            autoFit() { const wrap = document.getElementById('preview-stage'); const scale = Math.min((wrap.clientWidth - 80) / this.state.width, (wrap.clientHeight - 80) / this.state.height); this.state.viewScale = scale; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
-            updateTransform() { const dom = document.getElementById('chart-container'); dom.style.transform = `translate(${this.state.viewX}px, ${this.state.viewY}px) scale(${this.state.viewScale})`; document.getElementById('zoom-level').innerText = Math.round(this.state.viewScale * 100) + '%'; },
-            updateExportBtnText() { const fps = document.getElementById('export-fps').value; document.getElementById('btn-export').innerText = `📦 导出视频序列 (${fps}帧)`; },
+
+            zoom(delta) {
+                const newScale = Math.min(5, Math.max(0.05, this.state.viewScale + delta));
+                this.state.viewScale = newScale;
+                this.updateTransform();
+            },
+
+            resetZoom() {
+                this.state.viewScale = 1;
+                this.state.viewX = 0;
+                this.state.viewY = 0;
+                this.updateTransform();
+            },
+
+            autoFit() {
+                const wrap = document.getElementById('preview-stage');
+                const scale = Math.min(
+                    (wrap.clientWidth - 80) / this.state.width,
+                    (wrap.clientHeight - 80) / this.state.height
+                );
+                this.state.viewScale = scale;
+                this.state.viewX = 0;
+                this.state.viewY = 0;
+                this.updateTransform();
+            },
+
+            updateTransform() {
+                const dom = document.getElementById('chart-container');
+                dom.style.transform = `translate(${this.state.viewX}px, ${this.state.viewY}px) scale(${this.state.viewScale})`;
+                document.getElementById('zoom-level').innerText = Math.round(this.state.viewScale * 100) + '%';
+            },
+
+            updateExportBtnText() {
+                const fps = document.getElementById('export-fps').value;
+                document.getElementById('btn-export').innerText = `📦 导出视频序列 (${fps}帧)`;
+            },
             onTitleChange(val) { this.syncTitleAndFileName(val, true); this.runCode(false); },
             /** 同步标题与导出名：source 为当前值，fromTitle 为 true 表示来源是标题框（导出名用 sanitize），false 表示来源是导出名框（标题跟从，导出名不改写） */
             syncTitleAndFileName(source, fromTitle) {
@@ -1247,19 +1322,21 @@
             // --- V108: 核弹级递归注入 ---
             forceAnimation(obj, duration, easing) {
                 if (typeof obj !== 'object' || obj === null) return;
-                // 1. 强制开启
                 obj.animation = true;
-                // 2. 强制时长
                 obj.animationDuration = duration;
                 obj.animationDurationUpdate = duration;
-                // 3. 强制缓动
                 if (easing) {
                     obj.animationEasing = easing;
                     obj.animationEasingUpdate = easing;
                 }
-                // 4. 递归 (击穿所有 series, graphic, dataset)
-                for (let key in obj) {
-                    if (typeof obj[key] === 'object') this.forceAnimation(obj[key], duration, easing);
+                // 递归注入 (击穿所有 series, graphic, dataset)
+                for (const key in obj) {
+                    const val = obj[key];
+                    if (val && typeof val === 'object' && !Array.isArray(val)) {
+                        this.forceAnimation(val, duration, easing);
+                    } else if (Array.isArray(val)) {
+                        val.forEach(item => this.forceAnimation(item, duration, easing));
+                    }
                 }
             },
 
@@ -1407,7 +1484,7 @@
                 btn.innerText = old; btn.disabled = false;
             },
 
-            // exportLabelImage 功能已移除
+
 
             async startCinemaExport() {
                 if (this.isExporting) return;
@@ -1515,9 +1592,23 @@
                 this.autoFit();
                 this.runCode(true);
             },
-            toggleFreeze() { this.isFrozen = !this.isFrozen; const badge = document.getElementById('freeze-badge'); if (this.isFrozen) badge.style.display = 'block'; else { badge.style.display = 'none'; this.chart.dispatchAction({ type: 'hideTip' }); } this.runCode(false); },
-            autoFit() { const wrap = document.getElementById('preview-stage'); const scale = Math.min((wrap.clientWidth - 80) / this.state.width, (wrap.clientHeight - 80) / this.state.height); this.state.viewScale = scale; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
-            updateScale() { this.state.fontScale = parseFloat(document.getElementById('font-scale').value); this.state.tipScale = parseFloat(document.getElementById('tip-scale').value); this.runCode(false); },
+            toggleFreeze() {
+                this.isFrozen = !this.isFrozen;
+                const badge = document.getElementById('freeze-badge');
+                if (this.isFrozen) {
+                    badge.style.display = 'block';
+                } else {
+                    badge.style.display = 'none';
+                    this.chart.dispatchAction({ type: 'hideTip' });
+                }
+                this.runCode(false);
+            },
+
+            updateScale() {
+                this.state.fontScale = parseFloat(document.getElementById('font-scale').value);
+                this.state.tipScale = parseFloat(document.getElementById('tip-scale').value);
+                this.runCode(false);
+            },
             deepScale(obj) {
                 if (!obj || typeof obj !== 'object') return;
                 for (let key in obj) {
