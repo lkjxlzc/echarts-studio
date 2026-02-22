@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>图片导出</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        #sidebar {
+            width: 360px;
+            min-width: 320px;
+            padding: 0;
+            border-right: 1px solid rgba(0, 0, 0, 0.08);
+            background: #ffffff;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        #sidebar .sidebar-header {
+            flex-shrink: 0;
+            padding: 20px 18px 16px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        #sidebar .sidebar-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 16px 18px 20px;
+            padding-right: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        .nav-link {
+            font-size: 12px;
+            color: #0071e3;
+            text-decoration: none;
+        }
+
+        .nav-link:hover {
+            text-decoration: underline;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 220px;
+            resize: vertical;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            padding: 10px 12px;
+            font-family: "SF Mono", Menlo, Consolas, monospace;
+            font-size: 13px;
+            background: #1c1c1e;
+            color: #e5e5ea;
+            box-sizing: border-box;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.15);
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+        }
+
+        button {
+            padding: 9px 14px;
+            border-radius: 999px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .btn-main {
+            background: #0071e3;
+            color: #fff;
+        }
+
+        .btn-main:hover {
+            background: #0077ed;
+        }
+
+        .btn-sec {
+            background: rgba(0, 0, 0, 0.04);
+            color: #1d1d1f;
+        }
+
+        .btn-sec:hover {
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        /* preview / canvas stage */
+        #preview-stage {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            background: #e8e8ed;
+            background-image:
+                linear-gradient(45deg, #d1d1d6 25%, transparent 25%),
+                linear-gradient(-45deg, #d1d1d6 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #d1d1d6 75%),
+                linear-gradient(-45deg, transparent 75%, #d1d1d6 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 0, 10px -10px, 0 10px;
+            cursor: default;
+        }
+
+        #preview-stage:hover {
+            cursor: grab;
+        }
+
+        #chart-container:hover {
+            cursor: default;
+        }
+
+        #preview {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+        }
+
+        #chart-container {
+            width: 1080px;
+            height: 1890px;
+            transform-origin: center center;
+            transition: transform 120ms linear;
+            position: relative;
+            background: #ffffff;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+            border-radius: 16px;
+            box-sizing: border-box;
+        }
+
+        #chart {
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+            border-radius: 16px;
+        }
+
+        #status {
+            font-size: 12px;
+            color: #86868b;
+            min-height: 16px;
+        }
+
+        select.input-select {
+            padding: 6px 8px;
+            border-radius: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            font-size: 13px;
+            background: #fff;
+        }
+
+        #export-progress-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #export-progress-modal.show {
+            display: flex;
+        }
+
+        .export-progress-box {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px 28px;
+            min-width: 280px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .export-progress-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 12px;
+        }
+
+        /* Inline Editor */
+        #canvas-inline-editor {
+            position: absolute;
+            display: none;
+            z-index: 10001;
+            border: 2px solid #0071e3;
+            background: #fff;
+            outline: none;
+            padding: 2px 4px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+
+        .export-progress-bar-wrap {
+            height: 8px;
+            background: #e8e8ed;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .export-progress-bar {
+            height: 100%;
+            width: 0%;
+            background: #0071e3;
+            border-radius: 4px;
+            transition: width 0.2s ease;
+        }
+
+        #export-progress-modal.indeterminate .export-progress-bar {
+            width: 40%;
+            animation: export-progress-indeterminate 1.2s ease-in-out infinite;
+        }
+
+        @keyframes export-progress-indeterminate {
+            0% {
+                transform: translateX(-100%);
+            }
+
+            100% {
+                transform: translateX(350%);
+            }
+        }
+
+        .export-progress-text {
+            font-size: 12px;
+            color: #86868b;
+        }
+
+        #export-progress-modal.success .export-progress-title {
+            color: #34c759;
+        }
+
+        #export-progress-modal.success .export-progress-bar {
+            background: #34c759;
+            width: 100%;
+        }
+
+        .sidebar-heading {
+            font-size: 11px;
+            font-weight: 600;
+            color: #86868b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 14px 0 8px 0;
+            padding: 0 2px;
+        }
+
+        .sidebar-heading:first-of-type {
+            margin-top: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="export-progress-modal">
+        <div class="export-progress-box">
+            <div class="export-progress-title" id="export-progress-title">正在导出...</div>
+            <div class="export-progress-bar-wrap">
+                <div class="export-progress-bar" id="export-progress-bar"></div>
+            </div>
+            <div
+                style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#86868b; margin-bottom:8px;">
+                <span id="export-progress-text">请稍候</span>
+                <span id="export-progress-pct" style="font-weight:600; color:#1d1d1f;">0%</span>
+            </div>
+            <!-- 时间信息行 -->
+            <div id="export-time-row"
+                style="display:flex; justify-content:space-between; align-items:center; background:#f5f5f7; border-radius:8px; padding:8px 12px; font-size:12px;">
+                <span style="color:#86868b;">⏱ 已用时</span>
+                <span id="export-elapsed"
+                    style="font-family:monospace; font-weight:700; font-size:14px; color:#1d1d1f;">00:00</span>
+                <span style="color:#d1d1d6;">|</span>
+                <span style="color:#86868b;">剩余</span>
+                <span id="export-eta"
+                    style="font-family:monospace; font-weight:700; font-size:14px; color:#0071e3;">--:--</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="sidebar">
+        <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <h1>图片导出</h1>
+                <div style="font-size:12px; color:#86868b; margin-top:4px;">编辑代码 → 运行预览 → 导出图片</div>
+            </div>
+            <a class="nav-link" href="测试2.html">返回 视频导出</a>
+        </div>
+
+        <div class="sidebar-scroll">
+            <div class="section">
+                <label>导出文件名</label>
+                <input type="text" id="file-name" value="Table_Export" />
+            </div>
+
+            <div class="sidebar-heading">标题设置</div>
+            <div class="section">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <label style="margin:0;">标题</label>
+                    <label
+                        style="margin:0; font-size:12px; color:#86868b; display:flex; align-items:center; gap:6px;"><input
+                            type="checkbox" id="title-show"> 显示</label>
+                </div>
+                <input type="text" id="title-text" value="" placeholder="标题文字（可与文件名同步）" style="margin-bottom:8px;" />
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <div class="section" style="margin:0;">
+                        <label style="margin-bottom:4px;">大小</label>
+                        <input type="range" id="title-size" min="20" max="200" step="2" value="48" />
+                    </div>
+                    <div class="section" style="margin:0;">
+                        <label style="margin-bottom:4px;">垂直位置(%)</label>
+                        <input type="range" id="title-top" min="2" max="30" step="1" value="6" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-heading">模板表现</div>
+            <div class="section">
+                <label>文字缩放（影响 FONT_SCALE）</label>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <input type="range" id="font-scale" min="0.5" max="2.5" step="0.1" value="1.0" />
+                    <button class="btn-sec" id="font-up" title="放大字体">A+</button>
+                </div>
+            </div>
+            <div class="section">
+                <label>字体家族</label>
+                <div style="display:flex; gap:6px;">
+                    <select id="font-family" class="input-select" style="flex:1">
+                        <option value="sans-serif">系统默认 (sans-serif)</option>
+                        <option value="__load__">🔄 点击加载系统字体...</option>
+                        <option value="__manual__">⌨️ 手动输入字体...</option>
+                    </select>
+                </div>
+                <div id="font-manual-row" style="display:none; margin-top:6px;">
+                    <input type="text" id="font-manual" placeholder="例如: Microsoft YaHei"
+                        style="width:100%; padding:6px 8px; border-radius:8px; border:1px solid rgba(0,0,0,0.08); font-size:13px;" />
+                </div>
+            </div>
+
+            <div class="sidebar-heading">画布尺寸</div>
+            <div class="section">
+                <label>预设</label>
+                <select id="canvas-preset" class="input-select">
+                    <option value="1080,1890" selected>📱 8:14 竖屏（默认）</option>
+                    <option value="1080,1920">🎵 9:16 竖屏</option>
+                    <option value="1920,1080">📺 16:9 横屏</option>
+                    <option value="1080,1080">⬜ 1:1 正方形</option>
+                </select>
+                <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <label style="font-size:13px; margin:0;">宽</label>
+                        <input id="custom-width" type="number" min="64" step="1" value="1080"
+                            style="width:90px; padding:6px; border-radius:8px; border:1px solid rgba(0,0,0,0.08);" />
+                    </div>
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        <label style="font-size:13px; margin:0;">高</label>
+                        <input id="custom-height" type="number" min="64" step="1" value="1890"
+                            style="width:90px; padding:6px; border-radius:8px; border:1px solid rgba(0,0,0,0.08);" />
+                    </div>
+                    <label style="display:flex; align-items:center; gap:6px; font-size:13px; margin:0 6px;">
+                        <input id="lock-aspect" type="checkbox" /> 锁定比例
+                    </label>
+                    <button class="btn-sec" id="apply-size">应用</button>
+                    <button class="btn-sec" id="reset-size">重置</button>
+                </div>
+                <div style="margin-top:8px;">
+                    <label style="font-size:13px; margin:0 0 6px 0;">宽度 <span id="slider-width-val">1080</span>
+                        px</label>
+                    <input id="slider-width" type="range" min="200" max="4096" step="1" value="1080"
+                        style="width:100%;" />
+                </div>
+                <div style="margin-top:6px;">
+                    <label style="font-size:13px; margin:0 0 6px 0;">高度 <span id="slider-height-val">1890</span>
+                        px</label>
+                    <input id="slider-height" type="range" min="200" max="8192" step="1" value="1890"
+                        style="width:100%;" />
+                </div>
+            </div>
+
+            <div class="sidebar-heading">预览</div>
+            <div class="section">
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="btn-sec" onclick="TableApp.zoom(-0.1)" title="缩小">－</button>
+                    <button class="btn-sec" onclick="TableApp.zoom(0.1)" title="放大">＋</button>
+                    <button class="btn-sec" onclick="TableApp.autoFit()" style="flex:1;">Fit</button>
+                    <span style="font-size:12px; color:#666;">缩放 <span id="zoom-level">100%</span></span>
+                </div>
+            </div>
+
+            <div class="sidebar-heading">导出</div>
+            <div class="section">
+                <label>导出质量（截图与 ZIP 均按此质量）</label>
+                <select id="export-quality-preset" class="input-select">
+                    <option value="2">4K</option>
+                    <option value="8">8K</option>
+                </select>
+                <button class="btn-sec" id="shot-btn" style="width:100%; margin-top:8px;">📸 截图</button>
+                <button class="btn-sec" id="export-bg-nobg-zip-btn" style="width:100%; margin-top:8px;">📦
+                    导出「仅背景」+「无背景」ZIP</button>
+            </div>
+
+            <div class="sidebar-heading">编辑与运行</div>
+            <div class="section">
+                <button class="btn-main" id="run-btn" style="width:100%;">▶ 运行代码</button>
+                <label style="margin-top:10px; display:block;">JavaScript 代码（默认表格模板）</label>
+                <textarea id="code-area" spellcheck="false"></textarea>
+            </div>
+
+            <div id="status" style="margin-top:10px; min-height:18px;"></div>
+        </div>
+    </div>
+
+    <div id="preview-stage">
+        <div id="preview">
+            <div id="chart-container">
+                <div id="chart"></div>
+                <input type="text" id="canvas-inline-editor">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.TableApp = {
+            chart: null,
+            fontScale: 1.0,
+            state: {
+                width: 1080,
+                height: 1890,
+                viewScale: 0.45,
+                viewX: 0,
+                viewY: 0,
+                fontScale: 1,
+                tipScale: 1
+            },
+            isFrozen: false,
+            baseWidth: 1080,
+            baseHeight: 1890,
+
+            showInlineEditor(x, y, width, height, initialValue, textAlign, font, onSave) {
+                const editor = document.getElementById('canvas-inline-editor');
+                if (!editor) return;
+
+                editor.style.display = 'block';
+                editor.style.left = x + 'px';
+                editor.style.top = y + 'px';
+                editor.style.width = width + 'px';
+                editor.style.height = height + 'px';
+                editor.value = initialValue;
+                editor.style.textAlign = textAlign || 'center';
+                editor.style.font = font || '14px sans-serif';
+
+                // 强制重设样式以匹配 ECharts 视觉
+                editor.style.lineHeight = height + 'px';
+                editor.style.padding = '0';
+
+                const finish = () => {
+                    if (editor.style.display === 'none') return;
+                    editor.style.display = 'none';
+                    onSave(editor.value);
+                    this.runCode(); // 立即重绘
+                    window.removeEventListener('mousedown', checkBlur);
+                };
+
+                const checkBlur = (e) => {
+                    if (e.target !== editor) finish();
+                };
+
+                editor.onkeydown = (e) => {
+                    if (e.key === 'Enter') finish();
+                    if (e.key === 'Escape') {
+                        editor.style.display = 'none';
+                        window.removeEventListener('mousedown', checkBlur);
+                    }
+                };
+
+                // 延迟绑定，防止当前点击立即触发 finish
+                setTimeout(() => {
+                    window.addEventListener('mousedown', checkBlur);
+                    editor.focus();
+                    editor.select();
+                }, 10);
+            },
+
+            syncValueToCode(type, indexOrKey, newValue) {
+                const area = document.getElementById('code-area');
+                if (!area) return;
+                let code = area.value;
+
+                if (type === 'label') {
+                    if (indexOrKey === 'sideTitle' || indexOrKey === 'mainTitle') {
+                        const regex = new RegExp(`(${indexOrKey}:\\s*['"])([^'"]*)(['"])`);
+                        code = code.replace(regex, `$1${newValue}$3`);
+                    } else if (indexOrKey.startsWith('subTitle')) {
+                        const idx = parseInt(indexOrKey.replace('subTitle', ''));
+                        const subRegex = /(subTitles:\s*\[)([\s\S]*?)(\])/;
+                        code = code.replace(subRegex, (match, p1, p2, p3) => {
+                            const items = p2.split(/,\s*/);
+                            if (items[idx] !== undefined) {
+                                const oldVal = items[idx].trim();
+                                const quote = oldVal.startsWith('"') ? '"' : "'";
+                                items[idx] = `${quote}${newValue}${quote}`;
+                            }
+                            return p1 + items.join(', ') + p3;
+                        });
+                    }
+                } else if (type === 'data') {
+                    const { row, col } = indexOrKey;
+                    const dataBlockRegex = /(const DATA = \s*\[)([\s\S]*?)(\];)/;
+                    code = code.replace(dataBlockRegex, (match, p1, p2, p3) => {
+                        let inner = p2;
+                        const rowRegex = /\[([\s\S]*?)\]/g;
+                        let rowMatches = [];
+                        let m;
+                        while ((m = rowRegex.exec(inner)) !== null) {
+                            rowMatches.push({ full: m[0], content: m[1], index: m.index });
+                        }
+
+                        if (rowMatches[row]) {
+                            const targetRow = rowMatches[row];
+                            const colRegex = /(['"])(.*?)\1/g;
+                            let colMatches = [];
+                            let cm;
+                            while ((cm = colRegex.exec(targetRow.content)) !== null) {
+                                colMatches.push({ full: cm[0], index: cm.index });
+                            }
+
+                            if (colMatches[col]) {
+                                const targetCol = colMatches[col];
+                                const quote = targetCol.full.startsWith('"') ? '"' : "'";
+                                const newValStr = `${quote}${newValue}${quote}`;
+                                const newRowContent = targetRow.content.substring(0, targetCol.index) + newValStr + targetRow.content.substring(targetCol.index + targetCol.full.length);
+                                return p1 + inner.substring(0, targetRow.index + 1) + newRowContent + inner.substring(targetRow.index + targetRow.full.length - 1) + p3;
+                            }
+                        }
+                        return match;
+                    });
+                }
+
+                area.value = code;
+                localStorage.setItem('table_v2_code', code);
+            },
+
+            setStatus(msg, type) {
+                const el = document.getElementById('status');
+                if (!el) return;
+                el.textContent = msg;
+                el.style.color = type === 'error' ? '#ff3b30' : type === 'success' ? '#34c759' : type === 'info' ? '#0071e3' : '#86868b';
+            },
+
+            focusCodeArea() {
+                const area = document.getElementById('code-area');
+                if (area) {
+                    area.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    area.focus();
+                }
+            },
+
+            getExportName() {
+                const v = document.getElementById('file-name');
+                return (v && v.value ? String(v.value).trim() : '') || 'Table_Export';
+            },
+            applySize(w, h) {
+                const width = Math.max(64, parseInt(w, 10) || this.state.width);
+                const height = Math.max(64, parseInt(h, 10) || this.state.height);
+                this.state.width = width;
+                this.state.height = height;
+                const container = document.getElementById('chart-container');
+                if (container) {
+                    container.style.width = width + 'px';
+                    container.style.height = height + 'px';
+                }
+                if (this.chart) this.chart.resize({ width: width, height: height });
+                this.updateEffectiveFontScale();
+                this.refreshSizeUI();
+                this.autoFit();
+                this.runCode();
+            },
+            base64ToBlob(base64, mime) {
+                const bin = atob(base64);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                return new Blob([arr], { type: mime || 'image/png' });
+            },
+
+            async loadSystemFonts() {
+                if (!window.queryLocalFonts) {
+                    alert('当前浏览器不支持此功能 (需 Chrome 103+ / Edge)。\n请使用下方“手动输入”功能。');
+                    return;
+                }
+                try {
+                    const fonts = await window.queryLocalFonts();
+                    const select = document.getElementById('font-family');
+                    const families = new Set();
+                    fonts.forEach(f => families.add(f.family));
+                    const sorted = Array.from(families).sort();
+
+                    // Rebuild options
+                    select.innerHTML = '<option value="sans-serif">系统默认 (sans-serif)</option>';
+                    sorted.forEach(f => {
+                        const opt = document.createElement('option');
+                        opt.value = f;
+                        opt.textContent = f;
+                        select.appendChild(opt);
+                    });
+                    const manualOpt = document.createElement('option');
+                    manualOpt.value = '__manual__';
+                    manualOpt.textContent = '⌨️ 手动输入字体...';
+                    select.appendChild(manualOpt);
+
+                    this.setStatus('✅ 系统字体加载完成 (' + sorted.length + '个)', 'success');
+                } catch (err) {
+                    console.error(err);
+                    this.setStatus('❌ 字体访问被拒绝或出错', 'error');
+                }
+            },
+
+            updateFontState() {
+                const familyEl = document.getElementById('font-family');
+                const scaleEl = document.getElementById('font-scale');
+                this.fontScale = parseFloat(scaleEl && scaleEl.value || '1') || 1;
+                let family = (familyEl && familyEl.value) ? String(familyEl.value) : 'sans-serif';
+                if (family === '__manual__') {
+                    const manualEl = document.getElementById('font-manual');
+                    family = (manualEl && manualEl.value && manualEl.value.trim()) || 'sans-serif';
+                }
+                this.fontFamily = family;
+                this.updateEffectiveFontScale();
+                window.__TABLE_FONT_SCALE = this.effectiveFontScale || 1;
+                window.__TABLE_FONT_FAMILY = this.fontFamily;
+                window.__TABLE_CANVAS_WIDTH = this.state.width;
+                window.__TABLE_CANVAS_HEIGHT = this.state.height;
+            },
+
+            showExportProgress(title, pct, text) {
+                const modal = document.getElementById('export-progress-modal');
+                const titleEl = document.getElementById('export-progress-title');
+                const barEl = document.getElementById('export-progress-bar');
+                const textEl = document.getElementById('export-progress-text');
+                if (!modal || !titleEl || !barEl || !textEl) return;
+                titleEl.textContent = title || '正在导出...';
+                textEl.textContent = text || '请稍候';
+                modal.classList.remove('indeterminate', 'success');
+                if (pct < 0) {
+                    modal.classList.add('indeterminate');
+                    barEl.style.width = '40%';
+                } else {
+                    barEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+                }
+                modal.classList.add('show');
+            },
+            updateExportProgress(pct, text) {
+                const modal = document.getElementById('export-progress-modal');
+                const barEl = document.getElementById('export-progress-bar');
+                const textEl = document.getElementById('export-progress-text');
+                if (modal) modal.classList.remove('indeterminate');
+                if (barEl) barEl.style.width = Math.min(100, Math.max(0, pct)) + '%';
+                if (textEl && text !== undefined) textEl.textContent = text;
+            },
+            hideExportProgress(showSuccess) {
+                const modal = document.getElementById('export-progress-modal');
+                const titleEl = document.getElementById('export-progress-title');
+                if (!modal) return;
+                if (showSuccess) {
+                    modal.classList.add('success');
+                    if (titleEl) titleEl.textContent = '导出成功';
+                    const textEl = document.getElementById('export-progress-text');
+                    if (textEl) textEl.textContent = '文件已保存';
+                    setTimeout(() => {
+                        modal.classList.remove('show', 'success');
+                    }, 1800);
+                } else {
+                    modal.classList.remove('show', 'success');
+                }
+            },
+
+            handleCanvasDoubleClick(params) {
+                // params.offsetX/Y 是相对于 canvas 容器的坐标
+                const chartDom = document.getElementById('chart');
+                const rect = chartDom.getBoundingClientRect();
+
+                // 转换像素坐标为逻辑坐标 (grid 系统)
+                const point = this.chart.convertFromPixel({ gridIndex: 0 }, [params.offsetX, params.offsetY]);
+                if (!point) return;
+
+                const gx = point[0]; // 0-100
+                const gy = point[1]; // 0 - (DATA.length+2)
+
+                // 获取当前代码中的配置，用于计算宽度和内容
+                const code = document.getElementById('code-area').value;
+                // 简单提取 CONFIG 和 DATA (这里可以用简单的正则或 eval，eval 虽然有风险但在此场景最直接)
+                let currentConfig, currentData;
+                try {
+                    // 构造沙箱执行获取变量
+                    const sandbox = new Function('window', code + '\nreturn {CONFIG, DATA};');
+                    const globals = sandbox({});
+                    currentConfig = globals.CONFIG;
+                    currentData = globals.DATA;
+                } catch (e) { return; }
+
+                const w1 = 100 * currentConfig.widths.col1;
+                const w2 = 100 * currentConfig.widths.col2;
+                const w3 = 100 * currentConfig.widths.col3;
+
+                // 计算显示位置和初始值
+                let type, key, val, targetX, targetY, targetW, targetH, align = 'center';
+
+                // 获取单元格高度像素
+                const totalH = chartDom.clientHeight;
+                const rowH = totalH / (currentData.length + 2);
+                const totalW = chartDom.clientWidth;
+                const unitW = totalW / 100;
+
+                if (gx < w1) {
+                    // 侧标题 (跨 2 行) 或 数据行第一列 (row[0])
+                    if (gy < 2) {
+                        type = 'label'; key = 'sideTitle'; val = currentConfig.labels.sideTitle;
+                        targetX = 0; targetY = 0; targetW = w1 * unitW; targetH = rowH * 2;
+                    } else {
+                        // 数据行第一列
+                        const rowIdx = Math.floor(gy - 2);
+                        if (rowIdx >= currentData.length) return;
+                        type = 'data'; key = { row: rowIdx, col: 0 };
+                        val = currentData[rowIdx][0];
+                        targetX = 0; targetY = rowH * (rowIdx + 2); targetW = w1 * unitW; targetH = rowH;
+                    }
+                } else {
+                    const colIdx = gx < (w1 + w2) ? 0 : 1;
+                    const startX = colIdx === 0 ? w1 : (w1 + w2);
+                    const cw = colIdx === 0 ? w2 : w3;
+
+                    if (gy < 1) {
+                        // 主标题 (跨两列)
+                        type = 'label'; key = 'mainTitle'; val = currentConfig.labels.mainTitle;
+                        targetX = w1 * unitW; targetY = 0; targetW = (w2 + w3) * unitW; targetH = rowH;
+                    } else if (gy < 2) {
+                        // 副标题
+                        type = 'label'; key = 'subTitle' + colIdx; val = currentConfig.labels.subTitles[colIdx];
+                        targetX = startX * unitW; targetY = rowH; targetW = cw * unitW; targetH = rowH;
+                    } else {
+                        // 数据行
+                        const rowIdx = Math.floor(gy - 2);
+                        if (rowIdx >= currentData.length) return;
+                        type = 'data'; key = { row: rowIdx, col: colIdx + 1 };
+                        val = currentData[rowIdx][colIdx + 1];
+                        targetX = startX * unitW; targetY = rowH * (rowIdx + 2); targetW = cw * unitW; targetH = rowH;
+                    }
+                }
+
+                if (type) {
+                    // 计算编辑器字体 (同步渲染逻辑)
+                    const baseRow = 64;
+                    const vScale = Math.pow(rowH / baseRow, 0.65);
+                    const hScale = Math.pow(totalW / 1000, 0.15);
+                    const scale = Math.min(3.0, vScale * hScale) * (this.fontScale || 1);
+                    const baseSize = (key === 'mainTitle') ? 26 : 18;
+                    const fontSize = Math.round(baseSize * scale);
+                    const font = `bold ${fontSize}px ${this.fontFamily}`;
+
+                    this.showInlineEditor(targetX, targetY, targetW, targetH, val, align, font, (newVal) => {
+                        this.syncValueToCode(type, key, newVal);
+                    });
+                }
+            },
+
+            init() {
+                const dom = document.getElementById('chart');
+                if (!dom || typeof echarts === 'undefined') return;
+                this.chart = echarts.init(dom, null, { renderer: 'canvas', devicePixelRatio: 2 });
+
+                // 绑定双击事件到 ZR (直接处理坐标)
+                this.chart.getZr().on('dblclick', (params) => {
+                    this.handleCanvasDoubleClick(params);
+                });
+
+                const defaultCode = `const CONFIG = {
+    colors: {
+        bg: '#F8F8F8',      // 背景色
+        sidebar: '#f9dd42', // 副色
+        header: '#0b32ed',  // 字2/主色
+        subHeader1: '#E0E0E0', 
+        subHeader2: '#D0D0D0', 
+        textMain: '#222427',   // 字1
+        textContrast: '#FFFFFF',
+        highlight: '#0b32ed',  // 字2/主色
+        line: '#EEEEEE'
+    },
+    labels: {
+        sideTitle: '年龄（男）',
+        mainTitle: '投入阶段',
+        subTitles: ['A账户', 'B账户']
+    },
+    widths: { col1: 0.25, col2: 0.35, col3: 0.40 }
+};
+
+const DATA = [
+    ['35岁', '70w', '70w/年'],
+    ['36岁', '-', '70w/年'],
+    ['总共', '70w', '140w']
+];
+
+// 文字缩放系数（由左侧滑块控制）
+const FONT_SCALE = window.__TABLE_FONT_SCALE || 1;
+// 字体家族，由侧栏选择（可为复合字体串）
+const FONT_FAMILY = window.__TABLE_FONT_FAMILY || 'sans-serif';
+// 无色块模式：仅保留文字与网格线（导出「无背景」时设置）
+const NO_COLOR_BLOCKS = window.__TABLE_NO_COLOR_BLOCKS || false;
+// 仅色块模式：只保留除网格线和文字以外的所有色块（导出「仅背景」时设置）
+const BACKGROUND_ONLY = window.__TABLE_BACKGROUND_ONLY || false;
+
+// 全屏填充：应用户要求，取消任何留白限制，表格始终铺满画布
+let _gridLeft = 0, _gridRight = 0, _gridTop = 0, _gridBottom = 0;
+
+// 渲染引擎
+option = {
+    backgroundColor: BACKGROUND_ONLY ? CONFIG.colors.bg : (NO_COLOR_BLOCKS ? 'transparent' : CONFIG.colors.bg),
+    grid: { top: _gridTop, left: _gridLeft, right: _gridRight, bottom: _gridBottom },
+    xAxis: { show: false, min: 0, max: 100 },
+    // yAxis 范围根据数据长度动态调整 (数据行数 + 2行表头)
+    yAxis: { show: false, min: 0, max: DATA.length + 2, inverse: true },
+    series: [{
+        type: 'custom',
+        renderItem: (params, api) => {
+            const group = { type: 'group', children: [] };
+            const rowHeight = api.size([0, 1])[1];
+            const width = params.coordSys.width;
+            const w1 = width * CONFIG.widths.col1, w2 = width * CONFIG.widths.col2, w3 = width * CONFIG.widths.col3;
+            const sideBlockHeight = rowHeight * 2;
+
+            // 智能字号适配算法 (V2)：
+            // 采用“非线性”增长而非“直接线性”增长，防止大画布下字体无限膨胀
+            const baseRow = 64;
+            // 1. 纵向：使用 0.65 次方，让增长曲线更平缓（大尺寸下表现更得体）
+            const vScale = Math.pow(rowHeight / baseRow, 0.65);
+            // 2. 横向：极小权重补偿，适配超宽比例
+            const hScale = Math.pow(width / 1000, 0.15);
+            // 3. 最终缩放系数 (加入 3.0 倍率软上限)
+            const scale = Math.min(3.0, vScale * hScale) * (FONT_SCALE || 1);
+
+            // 基准字号
+            const BASE_FONT = {
+                sideTitle: 18,   // 左侧条
+                mainTitle: 26,   // 顶部标题
+                subTitle:  18,   // A/B 标题
+                cell:      16,   // 普通单元格
+                cellBold:  18    // 高亮单元格
+            };
+
+            const sideTitleFont = Math.round(BASE_FONT.sideTitle * scale);
+            const mainTitleFont = Math.round(BASE_FONT.mainTitle * scale);
+            const subTitleFont  = Math.round(BASE_FONT.subTitle  * scale);
+            const cellFont      = Math.round(BASE_FONT.cell      * scale);
+            const cellBoldFont  = Math.round(BASE_FONT.cellBold  * scale);
+
+            // 绘制表头 (仅在第一个数据项渲染时处理)
+            var headerFill = BACKGROUND_ONLY ? CONFIG.colors.sidebar : (NO_COLOR_BLOCKS ? 'transparent' : null);
+            var headerStroke = BACKGROUND_ONLY ? { stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { stroke: CONFIG.colors.line, lineWidth: 0.5 } : {});
+            if (params.dataIndex === 0) {
+                group.children.push(
+                    { type: 'rect', shape: { x: 0, y: 0, width: w1, height: sideBlockHeight }, style: Object.assign({ fill: headerFill || CONFIG.colors.sidebar }, headerStroke) },
+                    { type: 'rect', shape: { x: w1, y: 0, width: w2 + w3, height: rowHeight }, style: Object.assign({ fill: BACKGROUND_ONLY ? CONFIG.colors.header : (headerFill || CONFIG.colors.header) }, headerStroke) },
+                    { type: 'rect', shape: { x: w1, y: rowHeight, width: w2, height: rowHeight }, style: BACKGROUND_ONLY ? { fill: CONFIG.colors.subHeader1, stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { fill: 'transparent', stroke: CONFIG.colors.line, lineWidth: 0.5 } : { fill: CONFIG.colors.subHeader1, stroke: CONFIG.colors.bg }) },
+                    { type: 'rect', shape: { x: w1+w2, y: rowHeight, width: w3, height: rowHeight }, style: BACKGROUND_ONLY ? { fill: CONFIG.colors.subHeader2, stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { fill: 'transparent', stroke: CONFIG.colors.line, lineWidth: 0.5 } : { fill: CONFIG.colors.subHeader2, stroke: CONFIG.colors.bg }) }
+                );
+                if (!BACKGROUND_ONLY) {
+                    group.children.push(
+                        { type: 'text', style: { text: CONFIG.labels.sideTitle, x: w1/2, y: sideBlockHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: 'bold ' + sideTitleFont + 'px ' + FONT_FAMILY } },
+                        { type: 'text', style: { text: CONFIG.labels.mainTitle, x: w1 + (w2+w3)/2, y: rowHeight/2, fill: NO_COLOR_BLOCKS ? CONFIG.colors.textMain : CONFIG.colors.textContrast, textAlign: 'center', textVerticalAlign: 'middle', font: mainTitleFont + 'px ' + FONT_FAMILY } },
+                        { type: 'text', style: { text: CONFIG.labels.subTitles[0], x: w1 + w2/2, y: rowHeight*1.5, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: 'bold ' + subTitleFont + 'px ' + FONT_FAMILY } },
+                        { type: 'text', style: { text: CONFIG.labels.subTitles[1], x: w1 + w2 + w3/2, y: rowHeight*1.5, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: 'bold ' + subTitleFont + 'px ' + FONT_FAMILY } }
+                    );
+                }
+            }
+
+            // 绘制数据行
+            const row = DATA[params.dataIndex];
+            const yPos = (params.dataIndex + 2) * rowHeight;
+            var rowFill = BACKGROUND_ONLY ? (row[0] === '总共' ? 'rgba(0,0,0,0.02)' : 'transparent') : (NO_COLOR_BLOCKS ? 'transparent' : (row[0] === '总共' ? 'rgba(0,0,0,0.02)' : 'transparent'));
+            var rowStroke = BACKGROUND_ONLY ? { stroke: 'transparent', lineWidth: 0 } : { stroke: CONFIG.colors.line, lineWidth: 0.5 };
+            group.children.push(
+                { type: 'rect', shape: { x: 0, y: yPos, width: width, height: rowHeight }, style: Object.assign({ fill: rowFill }, rowStroke) }
+            );
+            if (!BACKGROUND_ONLY) {
+                group.children.push(
+                    { type: 'text', style: { text: row[0], x: w1/2, y: yPos + rowHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: cellFont + 'px ' + FONT_FAMILY } },
+                    { type: 'text', style: { text: row[1], x: w1 + w2/2, y: yPos + rowHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: cellFont + 'px ' + FONT_FAMILY } },
+                    { type: 'text', style: { text: row[2], x: w1 + w2 + w3/2, y: yPos + rowHeight/2, fill: CONFIG.colors.highlight, textAlign: 'center', textVerticalAlign: 'middle', font: 'bold ' + cellBoldFont + 'px ' + FONT_FAMILY } }
+                );
+            }
+            return group;
+        },
+        data: DATA.map((_, i) => i)
+    }]
+};`;
+
+                const codeArea = document.getElementById('code-area');
+                // 始终使用默认模板代码，方便预览
+                codeArea.value = defaultCode;
+                this.fontScale = parseFloat(document.getElementById('font-scale').value) || 1;
+                this.fontFamily = (document.getElementById('font-family') && document.getElementById('font-family').value) || 'sans-serif';
+                this.runCode();
+
+                document.getElementById('font-scale').addEventListener('input', (e) => {
+                    this.fontScale = parseFloat(e.target.value) || 1.0;
+                    this.runCode();
+                });
+                const fontUp = document.getElementById('font-up');
+                if (fontUp) fontUp.addEventListener('click', () => {
+                    const el = document.getElementById('font-scale');
+                    if (!el) return;
+                    let v = parseFloat(el.value) || 1.0;
+                    v = Math.min(2.5, Math.round((v + 0.1) * 10) / 10);
+                    el.value = v;
+                    this.fontScale = v;
+                    this.runCode();
+                });
+
+                const fontFamilyEl = document.getElementById('font-family');
+                if (fontFamilyEl) {
+                    fontFamilyEl.addEventListener('change', () => {
+                        const val = fontFamilyEl.value;
+                        const manualRow = document.getElementById('font-manual-row');
+                        if (val === '__load__') {
+                            this.loadSystemFonts();
+                            fontFamilyEl.value = 'sans-serif'; // reset after trigger
+                        } else if (val === '__manual__') {
+                            if (manualRow) manualRow.style.display = 'block';
+                        } else {
+                            if (manualRow) manualRow.style.display = 'none';
+                            this.runCode();
+                        }
+                    });
+                }
+                const fontManualEl = document.getElementById('font-manual');
+                if (fontManualEl) {
+                    fontManualEl.addEventListener('change', () => this.runCode());
+                }
+
+                // 标题设置：勾选、文字、大小、位置变化后刷新预览
+                ['title-show', 'title-text', 'title-size', 'title-top'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.addEventListener(id === 'title-show' ? 'change' : 'input', () => this.runCode());
+                });
+
+                document.getElementById('run-btn').addEventListener('click', () => this.runCode());
+                document.getElementById('shot-btn').addEventListener('click', () => this.captureWithSelectedQuality());
+                document.getElementById('export-bg-nobg-zip-btn').addEventListener('click', () => this.exportBackgroundAndNoBackgroundZip());
+
+                // canvas preset change
+                const preset = document.getElementById('canvas-preset');
+                if (preset) preset.addEventListener('change', () => this.applyPreset());
+
+                // custom size controls
+                const wIn = document.getElementById('custom-width');
+                const hIn = document.getElementById('custom-height');
+                const lock = document.getElementById('lock-aspect');
+                const applyBtn = document.getElementById('apply-size');
+                const resetBtn = document.getElementById('reset-size');
+                this.baseWidth = this.state.width;
+                this.baseHeight = this.state.height;
+
+                if (wIn && hIn) {
+                    // keep inputs in sync with current state
+                    wIn.value = this.state.width;
+                    hIn.value = this.state.height;
+                    wIn.addEventListener('input', (e) => {
+                        const nv = parseInt(e.target.value, 10) || this.state.width;
+                        if (lock && lock.checked && this.baseWidth) {
+                            const ratio = nv / this.baseWidth;
+                            hIn.value = Math.round(this.baseHeight * ratio);
+                        }
+                        // sync sliders
+                        const sW = document.getElementById('slider-width');
+                        const sH = document.getElementById('slider-height');
+                        if (sW) sW.value = nv;
+                        if (sH) sH.value = hIn.value;
+                        const swv = document.getElementById('slider-width-val');
+                        const shv = document.getElementById('slider-height-val');
+                        if (swv) swv.innerText = String(nv);
+                        if (shv) shv.innerText = String(hIn.value);
+                    });
+                    hIn.addEventListener('input', (e) => {
+                        const nv = parseInt(e.target.value, 10) || this.state.height;
+                        if (lock && lock.checked && this.baseHeight) {
+                            const ratio = nv / this.baseHeight;
+                            wIn.value = Math.round(this.baseWidth * ratio);
+                        }
+                        // sync sliders
+                        const sW = document.getElementById('slider-width');
+                        const sH = document.getElementById('slider-height');
+                        if (sW) sW.value = wIn.value;
+                        if (sH) sH.value = nv;
+                        const swv = document.getElementById('slider-width-val');
+                        const shv = document.getElementById('slider-height-val');
+                        if (swv) swv.innerText = String(wIn.value);
+                        if (shv) shv.innerText = String(nv);
+                    });
+                }
+
+                if (applyBtn) applyBtn.addEventListener('click', () => this.applyCustomSize());
+                if (resetBtn) resetBtn.addEventListener('click', () => {
+                    const presetEl = document.getElementById('canvas-preset');
+                    if (presetEl) { presetEl.value = this.baseWidth + ',' + this.baseHeight; }
+                    this.applyPreset();
+                });
+
+                // sliders: live update without clicking apply
+                const sW = document.getElementById('slider-width');
+                const sH = document.getElementById('slider-height');
+                const sWVal = document.getElementById('slider-width-val');
+                const sHVal = document.getElementById('slider-height-val');
+                if (sW) {
+                    sW.addEventListener('input', (e) => {
+                        const newW = parseInt(e.target.value, 10) || this.state.width;
+                        const newH = (lock && lock.checked && this.baseWidth)
+                            ? Math.round(this.baseHeight * (newW / this.baseWidth))
+                            : this.state.height;
+                        this.applySize(newW, newH);
+                    });
+                }
+                if (sH) {
+                    sH.addEventListener('input', (e) => {
+                        const newH = parseInt(e.target.value, 10) || this.state.height;
+                        const newW = (lock && lock.checked && this.baseHeight)
+                            ? Math.round(this.baseWidth * (newH / this.baseHeight))
+                            : this.state.width;
+                        this.applySize(newW, newH);
+                    });
+                }
+
+                // enable canvas controls (zoom/pan/fit)
+                this.updateEffectiveFontScale();
+                this.refreshSizeUI();
+                this.applyPreset();
+                this.initCanvasControl();
+
+                // 双击画布容器，由 handleCanvasDoubleClick 接管具体的 ZR 双击检测
+                const chartContainer = document.getElementById('chart-container');
+                const previewStage = document.getElementById('preview-stage');
+                if (previewStage) {
+                    previewStage.addEventListener('dblclick', (e) => {
+                        // 只有点到最外层空白背景时，才回退到聚焦代码区
+                        if (e.target === previewStage) {
+                            e.preventDefault();
+                            this.focusCodeArea();
+                        }
+                    });
+                }
+            },
+
+            updateEffectiveFontScale() {
+                const baseW = this.baseWidth || 1080;
+                const ratio = baseW > 0 ? (this.state.width / baseW) : 1;
+                this.effectiveFontScale = (this.fontScale || 1) * ratio;
+            },
+
+            refreshSizeUI() {
+                const w = this.state.width;
+                const h = this.state.height;
+                const wIn = document.getElementById('custom-width');
+                const hIn = document.getElementById('custom-height');
+                const sW = document.getElementById('slider-width');
+                const sH = document.getElementById('slider-height');
+                const sWVal = document.getElementById('slider-width-val');
+                const sHVal = document.getElementById('slider-height-val');
+                if (wIn) wIn.value = w;
+                if (hIn) hIn.value = h;
+                if (sW) sW.value = w;
+                if (sH) sH.value = h;
+                if (sWVal) sWVal.innerText = String(w);
+                if (sHVal) sHVal.innerText = String(h);
+            },
+
+            runCode() {
+                const code = document.getElementById('code-area').value;
+                if (typeof localStorage !== 'undefined') localStorage.setItem('echarts_shared_code', code);
+                if (!this.chart) return;
+
+                this.updateFontState();
+
+                try {
+                    const func = new Function('echarts', `
+                        var option;
+                        ${code}
+                        return option;
+                    `);
+                    let option = func(echarts);
+                    if (!option || typeof option !== 'object') {
+                        this.setStatus('运行失败：未返回有效的 option 对象', 'error');
+                        return;
+                    }
+                    // 运行新代码时：若代码里带了 title.text，自动同步到侧栏「标题」输入框，方便修改
+                    if (option.title && option.title.text != null && String(option.title.text).trim() !== '') {
+                        const titleInput = document.getElementById('title-text');
+                        if (titleInput) titleInput.value = String(option.title.text).trim();
+                    }
+                    // 通用标题：与视频导出一致，合并侧栏「标题设置」到 option.title（适用于任意 ECharts 代码）
+                    if (!option.title) option.title = {};
+                    const titleShowEl = document.getElementById('title-show');
+                    const titleShow = titleShowEl && titleShowEl.checked;
+                    option.title.show = titleShow;
+                    if (titleShow) {
+                        const titleTextEl = document.getElementById('title-text');
+                        if (titleTextEl && titleTextEl.value) option.title.text = titleTextEl.value.trim();
+                        const titleSizeEl = document.getElementById('title-size');
+                        const titleSize = titleSizeEl ? parseInt(titleSizeEl.value, 10) : 48;
+                        if (!option.title.textStyle) option.title.textStyle = {};
+                        option.title.textStyle.fontSize = titleSize;
+                        const titleTopEl = document.getElementById('title-top');
+                        const titleTop = titleTopEl ? titleTopEl.value : '6';
+                        option.title.top = titleTop + '%';
+                        option.title.left = 'center';
+                    }
+                    this.chart.clear();
+                    this.chart.setOption(option, { notMerge: true });
+                    this.setStatus('运行成功', 'success');
+                } catch (e) {
+                    this.setStatus('运行失败：' + (e && e.message ? e.message : e), 'error');
+                    console.error(e);
+                }
+            },
+            // --- canvas control functions (zoom / pan / fit) ---
+            initCanvasControl() {
+                const stage = document.getElementById('preview-stage');
+                if (!stage) return;
+                stage.addEventListener('wheel', (e) => { e.preventDefault(); const delta = e.deltaY > 0 ? -0.05 : 0.05; this.zoom(delta); }, { passive: false });
+                let isDragging = false, startX = 0, startY = 0, isSpacePressed = false;
+                window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') { isSpacePressed = true; stage.style.cursor = 'grab'; document.getElementById('chart-container').style.pointerEvents = 'none'; } });
+                window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; stage.style.cursor = 'default'; document.getElementById('chart-container').style.pointerEvents = 'auto'; } });
+                stage.addEventListener('mousedown', (e) => {
+                    const canDrag = e.button === 1 || (e.button === 0 && isSpacePressed) || (e.button === 0 && e.target === stage);
+                    if (canDrag) { isDragging = true; startX = e.clientX - this.state.viewX; startY = e.clientY - this.state.viewY; stage.style.cursor = 'grabbing'; e.preventDefault(); }
+                });
+                window.addEventListener('mousemove', (e) => { if (!isDragging) return; e.preventDefault(); this.state.viewX = e.clientX - startX; this.state.viewY = e.clientY - startY; this.updateTransform(); });
+                window.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; stage.style.cursor = isSpacePressed ? 'grab' : 'default'; } });
+                // double-click to toggle freeze
+                const chartContainer = document.getElementById('chart-container');
+                if (chartContainer) {
+                    chartContainer.addEventListener('dblclick', () => { this.toggleFreeze(); });
+                }
+            },
+
+            zoom(delta) { let newScale = this.state.viewScale + delta; if (newScale < 0.05) newScale = 0.05; if (newScale > 5) newScale = 5; this.state.viewScale = newScale; this.updateTransform(); },
+            resetZoom() { this.state.viewScale = 1; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            autoFit() { const wrap = document.getElementById('preview-stage'); const scale = Math.min((wrap.clientWidth - 80) / this.state.width, (wrap.clientHeight - 80) / this.state.height); this.state.viewScale = scale; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            updateTransform() { const dom = document.getElementById('chart-container'); if (!dom) return; dom.style.transform = `translate(${this.state.viewX}px, ${this.state.viewY}px) scale(${this.state.viewScale})`; const zl = document.getElementById('zoom-level'); if (zl) zl.innerText = Math.round(this.state.viewScale * 100) + '%'; },
+            applyPreset() {
+                const presetEl = document.getElementById('canvas-preset');
+                if (!presetEl) return;
+                const val = presetEl.value.split(',');
+                const w = parseInt(val[0], 10);
+                const h = parseInt(val[1], 10);
+                if (!isNaN(w) && !isNaN(h)) this.applySize(w, h);
+            },
+            applyCustomSize() {
+                const wIn = document.getElementById('custom-width');
+                const hIn = document.getElementById('custom-height');
+                const lock = document.getElementById('lock-aspect');
+                if (!wIn || !hIn) return;
+                let w = parseInt(wIn.value, 10) || this.state.width;
+                let h = parseInt(hIn.value, 10) || this.state.height;
+                if (lock && lock.checked && this.baseWidth && this.baseHeight) {
+                    const dw = Math.abs(w - this.state.width);
+                    const dh = Math.abs(h - this.state.height);
+                    if (dw >= dh) {
+                        h = Math.round(this.baseHeight * (w / this.baseWidth));
+                        hIn.value = h;
+                    } else {
+                        w = Math.round(this.baseWidth * (h / this.baseHeight));
+                        wIn.value = w;
+                    }
+                }
+                this.applySize(w, h);
+            },
+            toggleFreeze() {
+                this.isFrozen = !this.isFrozen;
+                const badge = document.getElementById('freeze-badge');
+                if (this.isFrozen) badge && (badge.style.display = 'block');
+                else { badge && (badge.style.display = 'none'); if (this.chart) this.chart.dispatchAction({ type: 'hideTip' }); }
+                this.runCode();
+            },
+
+            captureWithSelectedQuality() {
+                const qualityEl = document.getElementById('export-quality-preset');
+                const pixelRatio = Math.max(1, parseInt(qualityEl && qualityEl.value || '2', 10) || 2);
+                const label = pixelRatio === 8 ? '8K' : '4K';
+                this.captureAtQuality(pixelRatio, label);
+            },
+            // ─── Off-screen render helper: creates a hidden ECharts instance, ───
+            // ─── runs user code with injected flags, captures a PNG, disposes. ───
+            _renderOffscreen(code, flags, bgColor, pixelRatio) {
+                return new Promise((resolve, reject) => {
+                    // Create a hidden container matching the main chart size
+                    const w = this.state.width;
+                    const h = this.state.height;
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position:fixed;left:-99999px;top:-99999px;width:' + w + 'px;height:' + h + 'px;pointer-events:none;opacity:0;';
+                    document.body.appendChild(div);
+
+                    let offChart = null;
+                    try {
+                        offChart = echarts.init(div, null, { renderer: 'canvas', devicePixelRatio: 2 });
+
+                        // Inject the flag variables BEFORE user code, so any code works
+                        const injected = `
+                            window.__TABLE_BACKGROUND_ONLY = ${!!flags.backgroundOnly};
+                            window.__TABLE_NO_COLOR_BLOCKS = ${!!flags.noColorBlocks};
+                            window.__TABLE_FONT_SCALE  = ${this.effectiveFontScale || 1};
+                            window.__TABLE_FONT_FAMILY = '${(this.fontFamily || 'sans-serif').replace(/'/g, "\\'")}';
+                            window.__TABLE_CANVAS_WIDTH = ${this.state.width};
+                            window.__TABLE_CANVAS_HEIGHT = ${this.state.height};
+                        `;
+                        const func = new Function('echarts', `
+                            var option;
+                            ${injected}
+                            ${code}
+                            return option;
+                        `);
+                        let option = func(echarts);
+                        if (!option || typeof option !== 'object') {
+                            throw new Error('代码未返回有效的 option 对象');
+                        }
+
+                        // Apply title settings from sidebar (same as runCode)
+                        if (!option.title) option.title = {};
+                        const titleShowEl = document.getElementById('title-show');
+                        const titleShow = titleShowEl && titleShowEl.checked;
+                        option.title.show = titleShow;
+                        if (titleShow) {
+                            const titleTextEl = document.getElementById('title-text');
+                            if (titleTextEl && titleTextEl.value) option.title.text = titleTextEl.value.trim();
+                            const titleSizeEl = document.getElementById('title-size');
+                            const titleSize = titleSizeEl ? parseInt(titleSizeEl.value, 10) : 48;
+                            if (!option.title.textStyle) option.title.textStyle = {};
+                            option.title.textStyle.fontSize = titleSize;
+                            const titleTopEl = document.getElementById('title-top');
+                            option.title.top = (titleTopEl ? titleTopEl.value : '6') + '%';
+                            option.title.left = 'center';
+                        }
+
+                        offChart.setOption(option, { notMerge: true });
+
+                        // Wait for rendering, then capture
+                        const capture = () => {
+                            try {
+                                const dataUrl = offChart.getDataURL({
+                                    type: 'png',
+                                    pixelRatio: pixelRatio,
+                                    backgroundColor: bgColor
+                                });
+                                const base64 = dataUrl ? dataUrl.split(',')[1] : '';
+                                // Cleanup
+                                offChart.dispose();
+                                document.body.removeChild(div);
+                                // Restore globals
+                                window.__TABLE_BACKGROUND_ONLY = false;
+                                window.__TABLE_NO_COLOR_BLOCKS = false;
+                                if (base64) resolve(base64);
+                                else reject(new Error('getDataURL 返回空值'));
+                            } catch (err) {
+                                offChart.dispose();
+                                document.body.removeChild(div);
+                                window.__TABLE_BACKGROUND_ONLY = false;
+                                window.__TABLE_NO_COLOR_BLOCKS = false;
+                                reject(err);
+                            }
+                        };
+
+                        // Use multiple fallbacks for reliable wait
+                        let captured = false;
+                        const onceDone = () => { if (!captured) { captured = true; capture(); } };
+                        try { offChart.once('finished', () => setTimeout(onceDone, 80)); } catch (_) { }
+                        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(onceDone, 150))));
+                        setTimeout(onceDone, 2000);
+
+                    } catch (err) {
+                        if (offChart) try { offChart.dispose(); } catch (_) { }
+                        try { document.body.removeChild(div); } catch (_) { }
+                        window.__TABLE_BACKGROUND_ONLY = false;
+                        window.__TABLE_NO_COLOR_BLOCKS = false;
+                        reject(err);
+                    }
+                });
+            },
+
+            async exportBackgroundAndNoBackgroundZip() {
+                const btn = document.getElementById('export-bg-nobg-zip-btn');
+
+                // Guard: check dependencies
+                if (!this.chart) { alert('图表尚未初始化，请先运行代码！'); return; }
+                if (typeof JSZip === 'undefined') { alert('JSZip 库未加载，请检查网络连接后刷新页面'); return; }
+                if (typeof saveAs === 'undefined') { alert('FileSaver 库未加载，请检查网络连接后刷新页面'); return; }
+
+                // Disable button
+                if (btn) { btn.disabled = true; btn.textContent = '⏳ 导出中...'; }
+
+                const qualityEl = document.getElementById('export-quality-preset');
+                const pixelRatio = Math.max(1, parseInt((qualityEl && qualityEl.value) || '2', 10) || 2);
+                const label = pixelRatio === 8 ? '8K' : '4K';
+                const name = this.getExportName();
+                const code = document.getElementById('code-area').value;
+
+                // Ensure state is fresh
+                this.updateFontState();
+
+                // Timer setup
+                const startTime = Date.now();
+                const fmtTime = (ms) => {
+                    const s = Math.round(ms / 1000);
+                    const m = Math.floor(s / 60);
+                    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+                };
+
+                const elapsedEl = document.getElementById('export-elapsed');
+                const etaEl = document.getElementById('export-eta');
+                const pctEl = document.getElementById('export-progress-pct');
+                if (elapsedEl) elapsedEl.textContent = '00:00';
+                if (etaEl) etaEl.textContent = '--:--';
+                if (pctEl) pctEl.textContent = '0%';
+
+                const timer = setInterval(() => {
+                    const elapsed = Date.now() - startTime;
+                    if (elapsedEl) elapsedEl.textContent = fmtTime(elapsed);
+                    const barEl = document.getElementById('export-progress-bar');
+                    const curPct = barEl ? parseFloat(barEl.style.width) || 0 : 0;
+                    if (curPct > 3 && etaEl) {
+                        const totalEst = elapsed / (curPct / 100);
+                        const remaining = Math.max(0, totalEst - elapsed);
+                        etaEl.textContent = fmtTime(remaining);
+                    }
+                }, 1000);
+
+                const updateProg = (pct, text) => {
+                    this.updateExportProgress(pct, text);
+                    if (pctEl) pctEl.textContent = Math.round(pct) + '%';
+                };
+
+                // Get background color from current chart
+                const opt = this.chart.getOption();
+                let rawBg = opt && opt.backgroundColor;
+                let bgColor = (Array.isArray(rawBg) ? rawBg[0] : rawBg) || '#F8F8F8';
+                if (!bgColor || bgColor === 'transparent') bgColor = '#F8F8F8';
+
+                try {
+                    this.showExportProgress('📦 正在导出 ZIP...', 5, '准备中...');
+                    updateProg(5, '准备中...');
+                    await new Promise(r => setTimeout(r, 200));
+
+                    // ── Step 1: Background-only (色块，无文字) ──
+                    updateProg(10, '正在渲染「仅背景」(色块无文字)...');
+                    const bgBase64 = await this._renderOffscreen(
+                        code,
+                        { backgroundOnly: true, noColorBlocks: false },
+                        bgColor,
+                        pixelRatio
+                    );
+                    updateProg(45, '「仅背景」截图完成');
+
+                    // ── Step 2: Text-only (文字，透明背景) ──
+                    updateProg(50, '正在渲染「仅文字」(透明背景)...');
+                    const noBgBase64 = await this._renderOffscreen(
+                        code,
+                        { backgroundOnly: false, noColorBlocks: true },
+                        'transparent',
+                        pixelRatio
+                    );
+                    updateProg(80, '「仅文字」截图完成');
+
+                    // ── Step 3: Pack ZIP ──
+                    updateProg(85, '正在打包 ZIP...');
+                    const zip = new JSZip();
+                    const folder = zip.folder(name);
+                    folder.file('仅背景（色块无文字）.png', bgBase64, { base64: true });
+                    folder.file('仅文字（透明背景）.png', noBgBase64, { base64: true });
+
+                    const blob = await zip.generateAsync({ type: 'blob' });
+                    updateProg(100, '正在保存...');
+                    saveAs(blob, name + '_背景与文字.zip');
+
+                    // Success
+                    clearInterval(timer);
+                    const totalMs = Date.now() - startTime;
+                    if (elapsedEl) elapsedEl.textContent = fmtTime(totalMs);
+                    if (etaEl) etaEl.textContent = '完成 ✅';
+                    if (pctEl) pctEl.textContent = '100%';
+                    this.hideExportProgress(true);
+                    this.setStatus('✅ 已保存：' + name + '_背景与文字.zip（' + label + '，含2张图）', 'success');
+
+                } catch (e) {
+                    clearInterval(timer);
+                    this.hideExportProgress(false);
+                    const msg = e && e.message ? e.message : String(e);
+                    this.setStatus('❌ 导出失败：' + msg, 'error');
+                    console.error('[exportZip] 失败:', e);
+                } finally {
+                    window.__TABLE_BACKGROUND_ONLY = false;
+                    window.__TABLE_NO_COLOR_BLOCKS = false;
+                    if (btn) { btn.disabled = false; btn.textContent = '📦 导出「仅背景」+「无背景」ZIP'; }
+                }
+            },
+            captureAtQuality(pixelRatio, label) {
+                if (!this.chart) return;
+                const self = this;
+                this.showExportProgress('正在生成 ' + label + ' 截图...', -1, '请稍候，大尺寸导出可能需要几秒');
+                requestAnimationFrame(function () {
+                    requestAnimationFrame(function () {
+                        try {
+                            // 读取实际背景色（getOption 可能返回数组）
+                            const opt = self.chart.getOption();
+                            let bg = opt && opt.backgroundColor;
+                            if (Array.isArray(bg)) bg = bg[0];
+                            if (!bg || bg === 'transparent') bg = '#ffffff';
+                            const dataUrl = self.chart.getDataURL({
+                                type: 'png',
+                                pixelRatio: pixelRatio,
+                                backgroundColor: bg
+                            });
+                            const base64 = dataUrl.split(',')[1];
+                            const blob = self.base64ToBlob(base64);
+                            const suffix = label === '8K' ? '_8K.png' : '.png';
+                            saveAs(blob, self.getExportName() + suffix);
+                            self.updateExportProgress(100, '生成完成');
+                            self.hideExportProgress(true);
+                            self.setStatus('✅ ' + label + ' 截图已保存', 'success');
+                        } catch (e) {
+                            self.hideExportProgress(false);
+                            self.setStatus('❌ 截图失败：' + (e && e.message ? e.message : e), 'error');
+                        }
+                    });
+                });
+            }
+        };
+
+        window.onload = () => TableApp.init();
+    </script>
+</body>
+
+</html>
