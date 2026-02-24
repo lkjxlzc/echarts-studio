@@ -342,26 +342,15 @@
                     <span id="ai-api-status" class="text-[10px] font-semibold px-2 py-0.5 rounded-full"></span>
                 </div>
 
-                <!-- Provider & Model Selector -->
-                <div class="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                        <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">渠道</label>
-                        <select id="ai-provider" onchange="App.onProviderChange()"
-                            class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
-                            style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
-                            <option value="deepseek" selected>DeepSeek</option>
-                            <option value="openkey">OpenKey.red</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">模型</label>
-                        <select id="ai-model"
-                            class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
-                            style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
-                            <option value="deepseek-chat" selected>deepseek-chat</option>
-                            <option value="deepseek-reasoner">deepseek-reasoner</option>
-                        </select>
-                    </div>
+                <!-- Model Selector -->
+                <div class="mb-3">
+                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">模型</label>
+                    <select id="ai-model"
+                        class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
+                        style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+                        <option value="deepseek-chat" selected>deepseek-chat</option>
+                        <option value="deepseek-reasoner">deepseek-reasoner</option>
+                    </select>
                 </div>
 
                 <!-- Buttons -->
@@ -499,12 +488,12 @@
                     <select id="cfg-canvas" onchange="App.applyCanvasSize()"
                         class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
                         style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
-                        <option value="auto" selected>� 自动适配数据</option>
-                        <option value="1080,1890">�📱 8:14 竖屏</option>
+                        <option value="auto" selected>🖼️ 自动适配数据</option>
+                        <option value="1080,1890">📱 8:14 竖屏</option>
                         <option value="1080,1920">🎵 9:16 竖屏</option>
                         <option value="1920,1080">📺 16:9 横屏</option>
                         <option value="1080,1080">⬜ 1:1 正方形</option>
-                        <option value="800,600">🖥 4:3 经典</option>
+                        <option value="800,600">🖥️ 4:3 经典</option>
                     </select>
                 </div>
 
@@ -599,8 +588,14 @@
                 this.initCanvasControl();
                 this.applyCanvasSize();
 
-                // Initialize API provider and keys
-                this.onProviderChange();
+                // Default API key — restore from session or use built-in
+                const DEFAULT_KEY = 'sk-179eca9ce45b4bbda0537e00b1f78eca';
+                const savedKey = sessionStorage.getItem('deepseek_api_key');
+                const apiKeyEl = document.getElementById('ai-apikey');
+                if (apiKeyEl) apiKeyEl.value = savedKey || DEFAULT_KEY;
+
+                // Auto-test API on load
+                this.testApi();
 
                 // Init font panel (searchable dropdown like table.html)
                 this.initFontPanel();
@@ -663,6 +658,7 @@
 
                 if (!apiKey) {
                     if (statusBadge) { statusBadge.textContent = '❌ 无 Key'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
+                    if (statusEl) { statusEl.textContent = '❌ 请填写 API Key'; statusEl.style.color = '#ff3b30'; }
                     return;
                 }
                 if (statusBadge) { statusBadge.textContent = '⏳ 测试中'; statusBadge.style.cssText = 'color:#86868b;background:rgba(0,0,0,0.04);'; }
@@ -675,16 +671,16 @@
                         body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 })
                     });
                     const data = await res.json();
-                    if (data.error) {
-                        if (statusBadge) { statusBadge.textContent = '❌ 不可用'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
-                        if (statusEl) { statusEl.textContent = '❌ ' + (data.error.message || 'API 错误'); statusEl.style.color = '#ff3b30'; }
-                    } else {
+                    if (data.choices || data.id) {
                         if (statusBadge) { statusBadge.textContent = '✅ 可用'; statusBadge.style.cssText = 'color:#34c759;background:rgba(52,199,89,0.08);'; }
                         if (statusEl) { statusEl.textContent = '✅ API 连接正常'; statusEl.style.color = '#34c759'; }
+                    } else {
+                        throw new Error(data.error?.message || '未知错误');
                     }
                 } catch (e) {
                     if (statusBadge) { statusBadge.textContent = '❌ 不可用'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
                     if (statusEl) { statusEl.textContent = '❌ 网络错误: ' + (e.message || e); statusEl.style.color = '#ff3b30'; }
+                    console.error('API Test error:', e);
                 }
             },
 
@@ -819,21 +815,16 @@
             //  Hardened Precision Scraper — 精密金融数据转换器
             // ──────────────────────────────────────────────────
             async aiParse() {
-                const provider = document.getElementById('ai-provider').value;
                 const apiKey = (document.getElementById('ai-apikey')?.value || '').trim();
                 const model = document.getElementById('ai-model').value;
                 let rawText = document.getElementById('data-input').value.trim();
                 const statusEl = document.getElementById('ai-status');
                 const btn = document.getElementById('ai-parse-btn');
 
-                const endpoint = provider === 'deepseek'
-                    ? 'https://api.deepseek.com/chat/completions'
-                    : 'https://api.openkey.red/v1/chat/completions';
-
                 if (!apiKey) { statusEl.textContent = '❌ 请填写 API Key'; statusEl.style.color = '#ff3b30'; return; }
                 if (!rawText) { statusEl.textContent = '❌ 请先粘贴数据'; statusEl.style.color = '#ff3b30'; return; }
 
-                sessionStorage.setItem(`api_key_${provider}`, apiKey);
+                sessionStorage.setItem('deepseek_api_key', apiKey);
 
                 btn.disabled = true;
                 const oldText = btn.textContent;
