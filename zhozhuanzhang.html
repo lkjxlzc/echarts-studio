@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECharts 极速表格中转器</title>
+    <meta name="description" content="使用 ECharts custom 系列渲染高品质数据表格，支持实时预览与高清导出">
+
+    <!-- ECharts 5 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FileSaver for export -->
+    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+    <!-- JSZip for split export -->
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Display"', '"Segoe UI"', 'Roboto', 'sans-serif'],
+                        mono: ['"SF Mono"', '"Cascadia Code"', '"Fira Code"', 'Consolas', 'monospace'],
+                    },
+                    colors: {
+                        apple: {
+                            bg: '#f5f5f7',
+                            surface: '#ffffff',
+                            border: 'rgba(0,0,0,0.06)',
+                            text: '#1d1d1f',
+                            secondary: '#86868b',
+                            tertiary: '#aeaeb2',
+                            blue: '#007aff',
+                            green: '#34c759',
+                            red: '#ff3b30',
+                            orange: '#ff9500',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* ── Glassmorphism & Premium Overrides ── */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.82);
+            backdrop-filter: blur(40px) saturate(200%);
+            -webkit-backdrop-filter: blur(40px) saturate(200%);
+        }
+
+        .preview-grid {
+            background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.06) 1px, transparent 0);
+            background-size: 20px 20px;
+        }
+
+        /* ── Custom scrollbar ── */
+        .slim-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+
+        .slim-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .slim-scroll::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 99px;
+        }
+
+        .slim-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        /* ── iOS Toggle Switch ── */
+        .ios-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .ios-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .ios-toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: rgba(120, 120, 128, 0.2);
+            border-radius: 26px;
+            transition: background 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .ios-toggle .slider::before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 1px 1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .ios-toggle input:checked+.slider {
+            background: #007aff;
+        }
+
+        .ios-toggle input:checked+.slider::before {
+            transform: translateX(18px);
+        }
+
+        /* ── Range slider Apple style ── */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 99px;
+            outline: none;
+            background: linear-gradient(90deg, rgba(0, 122, 255, 0.15), rgba(120, 120, 128, 0.2));
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 4px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+            transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.12);
+        }
+
+        input[type="range"]::-webkit-slider-thumb:active {
+            transform: scale(0.95);
+        }
+
+        /* ── Button Spring ── */
+        .btn-spring {
+            transition: all 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .btn-spring:hover {
+            transform: translateY(-0.5px);
+        }
+
+        .btn-spring:active {
+            transform: scale(0.97) translateY(0.5px);
+            transition-duration: 0.08s;
+        }
+
+        /* ── Zoom toolbar glass ── */
+        .zoom-bar {
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: blur(24px) saturate(200%);
+            -webkit-backdrop-filter: blur(24px) saturate(200%);
+            border: 0.5px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* ── Fade-in animation ── */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-up {
+            animation: fadeUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        /* ── Color swatch ring ── */
+        input[type="color"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 36px;
+            height: 36px;
+            border: none;
+            padding: 0;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.1);
+            transition: box-shadow 0.2s;
+        }
+
+        input[type="color"]:hover {
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.3), 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 2px;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+
+        /* ── Font Dropdown (sync with table.html) ── */
+        .font-dropdown-list {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            margin-top: 4px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 1000;
+            padding: 4px;
+            list-style: none;
+            display: none;
+            margin-bottom: 0;
+            box-sizing: border-box;
+        }
+
+        .font-dropdown-list.show {
+            display: block;
+        }
+
+        .font-dropdown-item {
+            padding: 7px 10px;
+            font-size: 12px;
+            color: #1d1d1f;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.1s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin: 0;
+        }
+
+        .font-dropdown-item:hover,
+        .font-dropdown-item.active {
+            background: #007AFF;
+            color: #fff;
+        }
+
+        #ai-status.success-toast {
+            animation: status-success 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes status-success {
+            0% {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen flex bg-apple-bg text-apple-text font-sans overflow-hidden">
+
+    <!-- ═══════════════════════ LEFT SIDEBAR ═══════════════════════ -->
+    <aside id="sidebar"
+        class="glass-panel w-[340px] min-w-[300px] flex flex-col border-r border-apple-border z-50 shadow-sm">
+
+        <!-- Header -->
+        <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-apple-border bg-white/90 fade-up">
+            <div class="flex items-center justify-between mb-1">
+                <h1 class="text-xl font-bold tracking-tight">
+                    极速表格 <span class="text-apple-blue">中转器</span>
+                </h1>
+                <span
+                    class="text-[10px] font-semibold text-apple-tertiary bg-black/[0.04] px-2.5 py-1 rounded-full tracking-wide">V1.0</span>
+            </div>
+            <p class="text-xs text-apple-secondary">粘贴数据 → 配置样式 → 实时渲染 → 高清导出</p>
+        </div>
+
+        <!-- Scrollable Config Area -->
+        <div class="flex-1 overflow-y-auto slim-scroll flex flex-col gap-2 p-3">
+
+            <!-- ── Data Input ── -->
+            <section class="bg-white rounded-xl border border-apple-border shadow-xs p-4 fade-up"
+                style="animation-delay:0.05s">
+                <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider mb-2">数据输入</h2>
+                <textarea id="data-input" rows="8" spellcheck="false"
+                    class="w-full rounded-lg border border-black/10 bg-black/[0.02] p-3 text-[13px] font-mono leading-relaxed resize-none
+                           focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue transition-all"
+                    placeholder="粘贴 CSV/TSV/空格分隔数据，例如：&#10;姓名,年龄,城市,得分&#10;张三,28,北京,95&#10;李四,32,上海,88&#10;王五,25,广州,92">姓名,年龄,城市,得分
+张三,28,北京,95
+李四,32,上海,88
+王五,25,广州,92
+赵六,36,深圳,78
+孙七,29,杭州,91
+周八,41,成都,85</textarea>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="App.render(true)"
+                        class="btn-spring flex-1 bg-gradient-to-b from-[#0a84ff] to-apple-blue text-white text-[13px] font-semibold py-2.5 rounded-full shadow-md shadow-apple-blue/20">
+                        ▶ 渲染表格
+                    </button>
+                    <button onclick="App.clearData()"
+                        class="btn-spring px-4 py-2.5 rounded-full text-[13px] font-medium bg-black/[0.04] border border-black/[0.06] text-apple-text hover:bg-black/[0.08]">
+                        清空
+                    </button>
+                </div>
+                <p id="parse-status" class="text-[11px] text-apple-tertiary mt-2 min-h-[16px]"></p>
+            </section>
+
+            <!-- ── DeepSeek AI Integration ── -->
+            <section class="bg-white rounded-xl border border-apple-border shadow-xs p-4 fade-up"
+                style="animation-delay:0.1s">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider">🤖 AI 智能解析
+                    </h2>
+                    <span id="ai-api-status" class="text-[10px] font-semibold px-2 py-0.5 rounded-full"></span>
+                </div>
+
+                <!-- Provider & Model Selector -->
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                        <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">渠道</label>
+                        <select id="ai-provider" onchange="App.onProviderChange()"
+                            class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
+                            style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+                            <option value="deepseek" selected>DeepSeek</option>
+                            <option value="openkey">OpenKey.red</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">模型</label>
+                        <select id="ai-model"
+                            class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
+                            style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+                            <option value="deepseek-chat" selected>deepseek-chat</option>
+                            <option value="deepseek-reasoner">deepseek-reasoner</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex gap-2 mb-2">
+                    <button id="ai-parse-btn" onclick="App.aiParse()"
+                        class="btn-spring flex-1 bg-gradient-to-b from-purple-500 to-purple-600 text-white text-[12px] font-semibold py-2 rounded-full shadow-md shadow-purple-500/20">
+                        ✨ AI 解析数据
+                    </button>
+                    <button onclick="App.testApi()"
+                        class="btn-spring px-3 py-2 rounded-full text-[12px] font-medium bg-black/[0.04] border border-black/[0.06] text-apple-text hover:bg-black/[0.08]">
+                        🔌 测试
+                    </button>
+                </div>
+                <p id="ai-status" class="text-[10px] text-apple-tertiary mt-1 text-center min-h-[14px]"></p>
+
+                <!-- Collapsible API Key Editor -->
+                <details class="mt-2">
+                    <summary
+                        class="text-[10px] text-apple-tertiary cursor-pointer hover:text-apple-blue transition-colors">
+                        ⚙️ 修改 API Key</summary>
+                    <input type="password" id="ai-apikey" placeholder="sk-xxxxxxxxxxxxxxxx"
+                        class="w-full mt-2 px-3 py-2 rounded-lg border border-black/10 bg-black/[0.02] text-[12px] font-mono
+                               focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all" onchange="App.saveApiKey()">
+                </details>
+            </section>
+
+            <!-- ── Style Config ── -->
+            <section class="bg-white rounded-xl border border-apple-border shadow-xs p-4 fade-up"
+                style="animation-delay:0.15s">
+                <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider mb-3">样式配置</h2>
+
+                <!-- Primary Color -->
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-[13px] font-medium">主色调</label>
+                    <input type="color" id="cfg-color" value="#007AFF" onchange="App.render(false)">
+                </div>
+
+                <!-- Font Family (searchable, like table.html) -->
+                <div class="mb-4" style="position:relative; z-index:50;">
+                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">字体面板</label>
+                    <div style="display:flex; gap:6px; position:relative;">
+                        <div style="flex:1; position:relative;">
+                            <input type="text" id="font-family-input"
+                                class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all"
+                                placeholder="搜索或输入字体" value="sans-serif" autocomplete="off">
+                            <ul id="font-dropdown-list" class="font-dropdown-list">
+                                <li class="font-dropdown-item" data-val="sans-serif">系统默认 (sans-serif)</li>
+                            </ul>
+                        </div>
+                        <button id="font-load-btn"
+                            class="btn-spring px-2.5 py-2 rounded-lg text-[13px] bg-black/[0.04] border border-black/[0.06] hover:bg-black/[0.08]"
+                            title="加载本地系统字体">🔄</button>
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                        <select id="font-style-select"
+                            class="flex-1 px-2 py-1.5 rounded-lg border border-black/10 bg-white text-[12px] cursor-pointer focus:outline-none transition-all appearance-none"
+                            style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 8px center;padding-right:24px;">
+                            <option value="Regular">Regular</option>
+                        </select>
+                        <div class="flex items-center gap-1.5">
+                            <span id="font-scale-val"
+                                class="text-[11px] font-semibold text-apple-blue tabular-nums min-w-[32px] text-right">100%</span>
+                            <input type="range" id="font-scale" min="0.5" max="3.0" step="0.1" value="1.0"
+                                title="文字缩放比例" class="w-20">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column Width Ratio -->
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="text-[12px] font-medium text-apple-secondary">列宽比例</label>
+                        <span id="cfg-colwidth-val"
+                            class="text-[11px] font-semibold text-apple-blue tabular-nums">1.0</span>
+                    </div>
+                    <input type="range" id="cfg-colwidth" min="0.5" max="2.0" step="0.1" value="1.0"
+                        oninput="document.getElementById('cfg-colwidth-val').textContent=this.value; App.render(false)"
+                        class="w-full">
+                </div>
+
+                <!-- Row Height -->
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="text-[12px] font-medium text-apple-secondary">行高</label>
+                        <span id="cfg-rowheight-val"
+                            class="text-[11px] font-semibold text-apple-blue tabular-nums">48</span>
+                    </div>
+                    <input type="range" id="cfg-rowheight" min="30" max="80" step="2" value="48"
+                        oninput="document.getElementById('cfg-rowheight-val').textContent=this.value; App.render(false)"
+                        class="w-full">
+                </div>
+
+                <!-- Header Font Size -->
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="text-[12px] font-medium text-apple-secondary">表头字号</label>
+                        <span id="cfg-hfontsize-val"
+                            class="text-[11px] font-semibold text-apple-blue tabular-nums">16</span>
+                    </div>
+                    <input type="range" id="cfg-hfontsize" min="10" max="30" step="1" value="16"
+                        oninput="document.getElementById('cfg-hfontsize-val').textContent=this.value; App.render(false)"
+                        class="w-full">
+                </div>
+
+                <!-- Body Font Size -->
+                <div class="mb-2">
+                    <div class="flex justify-between items-center mb-1.5">
+                        <label class="text-[12px] font-medium text-apple-secondary">内容字号</label>
+                        <span id="cfg-bfontsize-val"
+                            class="text-[11px] font-semibold text-apple-blue tabular-nums">14</span>
+                    </div>
+                    <input type="range" id="cfg-bfontsize" min="10" max="26" step="1" value="14"
+                        oninput="document.getElementById('cfg-bfontsize-val').textContent=this.value; App.render(false)"
+                        class="w-full">
+                </div>
+            </section>
+
+            <!-- ── Background & Export ── -->
+            <section class="bg-white rounded-xl border border-apple-border shadow-xs p-4 fade-up"
+                style="animation-delay:0.2s">
+                <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider mb-3">背景与导出</h2>
+
+                <!-- Background Toggle -->
+                <div class="flex items-center justify-between mb-4">
+                    <label class="text-[13px] font-medium">透明背景</label>
+                    <label class="ios-toggle">
+                        <input type="checkbox" id="cfg-transparent" onchange="App.render(false)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- Canvas Size -->
+                <div class="mb-4">
+                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">画布尺寸</label>
+                    <select id="cfg-canvas" onchange="App.applyCanvasSize()"
+                        class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
+                        style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+                        <option value="auto" selected>� 自动适配数据</option>
+                        <option value="1080,1890">�📱 8:14 竖屏</option>
+                        <option value="1080,1920">🎵 9:16 竖屏</option>
+                        <option value="1920,1080">📺 16:9 横屏</option>
+                        <option value="1080,1080">⬜ 1:1 正方形</option>
+                        <option value="800,600">🖥 4:3 经典</option>
+                    </select>
+                </div>
+
+                <!-- Export Quality -->
+                <div class="mb-4">
+                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">导出质量</label>
+                    <select id="cfg-quality"
+                        class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
+                        style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
+                        <option value="2">4K 高清</option>
+                        <option value="8">8K 超清</option>
+                    </select>
+                </div>
+
+                <!-- Export Filename -->
+                <div class="mb-4">
+                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">导出文件名</label>
+                    <input type="text" id="cfg-filename" value="ECharts_Table"
+                        class="w-full px-3 py-2 rounded-lg border border-black/10 bg-black/[0.02] text-[13px] font-semibold text-center
+                               focus:outline-none focus:ring-2 focus:ring-apple-blue/20 focus:border-apple-blue transition-all">
+                </div>
+
+                <!-- Export Buttons -->
+                <button onclick="App.exportHD()"
+                    class="btn-spring w-full bg-gradient-to-b from-[#30d158] to-apple-green text-white text-[13px] font-semibold py-2.5 rounded-full shadow-md shadow-apple-green/20 mb-2">
+                    📸 截图导出
+                </button>
+                <button onclick="App.exportTransparent()"
+                    class="btn-spring w-full px-4 py-2.5 rounded-full text-[13px] font-medium bg-black/[0.04] border border-black/[0.06] text-apple-text hover:bg-black/[0.08] mb-2">
+                    🔲 导出透明背景
+                </button>
+                <button id="export-zip-btn" onclick="App.exportSplitZip()"
+                    class="btn-spring w-full px-4 py-2.5 rounded-full text-[13px] font-medium bg-gradient-to-b from-orange-400 to-orange-500 text-white shadow-md shadow-orange-400/20">
+                    📦 导出「仅背景」+「仅文字」ZIP
+                </button>
+                <p id="export-status" class="text-[10px] text-apple-tertiary mt-2 text-center min-h-[14px]"></p>
+            </section>
+
+            <!-- ── Quick Links ── -->
+            <div class="text-center py-2 fade-up" style="animation-delay:0.25s">
+                <a href="Echart.html"
+                    class="text-[12px] text-apple-blue font-medium hover:opacity-70 transition-opacity">← 返回 ECharts
+                    Studio</a>
+                <span class="text-apple-tertiary mx-2">|</span>
+                <a href="table.html"
+                    class="text-[12px] text-apple-blue font-medium hover:opacity-70 transition-opacity">表格导出工具 →</a>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ═══════════════════════ RIGHT PREVIEW ═══════════════════════ -->
+    <main id="preview-stage"
+        class="flex-1 relative flex justify-center items-center overflow-hidden preview-grid bg-[#ececf0]"
+        style="background: radial-gradient(ellipse at 30% 20%, rgba(0,122,255,0.03) 0%, transparent 60%), radial-gradient(ellipse at 70% 80%, rgba(175,82,222,0.03) 0%, transparent 60%), #ececf0;">
+
+        <!-- Chart Container -->
+        <div id="chart-container" class="bg-white rounded-2xl shadow-xl"
+            style="width:1080px; height:1890px; transform-origin:center center;"></div>
+
+        <!-- Zoom Toolbar -->
+        <div
+            class="zoom-bar absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full px-3 py-1.5 flex items-center gap-1 shadow-lg z-50">
+            <button onclick="App.zoom(-0.05)"
+                class="btn-spring w-8 h-8 flex items-center justify-center rounded-lg text-base font-medium hover:bg-black/[0.06]">−</button>
+            <span id="zoom-level"
+                class="text-[12px] font-semibold text-apple-secondary tabular-nums min-w-[40px] text-center">45%</span>
+            <button onclick="App.zoom(0.05)"
+                class="btn-spring w-8 h-8 flex items-center justify-center rounded-lg text-base font-medium hover:bg-black/[0.06]">+</button>
+            <div class="w-px h-4 bg-black/10 mx-1"></div>
+            <button onclick="App.autoFit()"
+                class="btn-spring px-2.5 h-8 flex items-center justify-center rounded-lg text-[12px] font-semibold hover:bg-black/[0.06]">Fit</button>
+            <button onclick="App.resetZoom()"
+                class="btn-spring px-2.5 h-8 flex items-center justify-center rounded-lg text-[12px] font-semibold hover:bg-black/[0.06]">1:1</button>
+        </div>
+    </main>
+
+    <!-- ═══════════════════════ JAVASCRIPT ENGINE ═══════════════════════ -->
+    <script>
+        window.App = {
+            chart: null,
+            fontFamily: 'sans-serif',
+            fontScale: 1.0,
+            availableFonts: [],
+            state: { width: 1080, height: 1890, viewScale: 0.45, viewX: 0, viewY: 0 },
+
+            // ──────────────────────────────────────────────────
+            //  INIT
+            // ──────────────────────────────────────────────────
+            init() {
+                const dom = document.getElementById('chart-container');
+                this.chart = echarts.init(dom, null, { renderer: 'canvas', devicePixelRatio: 2 });
+                this.initCanvasControl();
+                this.applyCanvasSize();
+
+                // Initialize API provider and keys
+                this.onProviderChange();
+
+                // Init font panel (searchable dropdown like table.html)
+                this.initFontPanel();
+
+                // Ctrl+Enter shortcut
+                window.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey && e.key === 'Enter') this.render(true);
+                });
+
+                // Initial render
+                this.render(true);
+            },
+
+            // ──────────────────────────────────────────────────
+            //  DATA PARSING — auto-detect CSV / TSV / space
+            // ──────────────────────────────────────────────────
+            parseInputData(raw) {
+                if (!raw || !raw.trim()) return null;
+                const lines = raw.trim().split('\n').map(l => l.trim()).filter(l => l);
+                if (lines.length < 2) return null; // need at least header + 1 row
+
+                // Detect delimiter: tab > comma > multiple-spaces
+                const firstLine = lines[0];
+                let delimiter;
+                if (firstLine.includes('\t')) delimiter = '\t';
+                else if (firstLine.includes(',')) delimiter = ',';
+                else if (firstLine.includes('|')) delimiter = '|';
+                else delimiter = /\s{2,}/; // multiple spaces
+
+                const splitLine = (line) => {
+                    if (delimiter instanceof RegExp) return line.split(delimiter).map(s => s.trim());
+                    return line.split(delimiter).map(s => s.trim());
+                };
+
+                const headers = splitLine(lines[0]);
+                const rows = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cells = splitLine(lines[i]);
+                    // Pad or trim to match header count
+                    while (cells.length < headers.length) cells.push('');
+                    rows.push(cells.slice(0, headers.length));
+                }
+
+                return { headers, rows };
+            },
+
+            // ──────────────────────────────────────────────────
+            //  API KEY — save / test
+            // ──────────────────────────────────────────────────
+            saveApiKey() {
+                const key = document.getElementById('ai-apikey').value.trim();
+                if (key) sessionStorage.setItem('deepseek_api_key', key);
+                this.testApi();
+            },
+
+            async testApi() {
+                const apiKey = (document.getElementById('ai-apikey')?.value || '').trim();
+                const statusBadge = document.getElementById('ai-api-status');
+                const statusEl = document.getElementById('ai-status');
+
+                if (!apiKey) {
+                    if (statusBadge) { statusBadge.textContent = '❌ 无 Key'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
+                    return;
+                }
+                if (statusBadge) { statusBadge.textContent = '⏳ 测试中'; statusBadge.style.cssText = 'color:#86868b;background:rgba(0,0,0,0.04);'; }
+                if (statusEl) { statusEl.textContent = '正在验证 API Key...'; statusEl.style.color = '#86868b'; }
+
+                try {
+                    const res = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                        body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 })
+                    });
+                    const data = await res.json();
+                    if (data.error) {
+                        if (statusBadge) { statusBadge.textContent = '❌ 不可用'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
+                        if (statusEl) { statusEl.textContent = '❌ ' + (data.error.message || 'API 错误'); statusEl.style.color = '#ff3b30'; }
+                    } else {
+                        if (statusBadge) { statusBadge.textContent = '✅ 可用'; statusBadge.style.cssText = 'color:#34c759;background:rgba(52,199,89,0.08);'; }
+                        if (statusEl) { statusEl.textContent = '✅ API 连接正常'; statusEl.style.color = '#34c759'; }
+                    }
+                } catch (e) {
+                    if (statusBadge) { statusBadge.textContent = '❌ 不可用'; statusBadge.style.cssText = 'color:#ff3b30;background:rgba(255,59,48,0.08);'; }
+                    if (statusEl) { statusEl.textContent = '❌ 网络错误: ' + (e.message || e); statusEl.style.color = '#ff3b30'; }
+                }
+            },
+
+            // ──────────────────────────────────────────────────
+            //  FONT PANEL — searchable dropdown (like table.html)
+            // ──────────────────────────────────────────────────
+            async loadSystemFonts() {
+                if (!window.queryLocalFonts) {
+                    alert('当前浏览器不支持读取系统字体列表 (需 Chrome 103+ / Edge)。\n你可以直接在文本框中输入字体名 (例如 "Microsoft YaHei") 来强制应用。');
+                    return;
+                }
+                try {
+                    const fonts = await window.queryLocalFonts();
+                    const familyMap = new Map();
+                    fonts.forEach(f => {
+                        let existing = familyMap.get(f.family);
+                        if (!existing) { existing = { fullName: f.fullName, styles: [] }; familyMap.set(f.family, existing); }
+                        existing.styles.push({ style: f.style || 'Regular', fullName: f.fullName, postscriptName: f.postscriptName });
+                        if (/[\u4e00-\u9fa5]/.test(f.fullName) && !/[\u4e00-\u9fa5]/.test(existing.fullName)) existing.fullName = f.fullName;
+                    });
+                    familyMap.forEach(v => {
+                        const uniq = []; const seen = new Set();
+                        v.styles.forEach(s => { if (!seen.has(s.style)) { seen.add(s.style); uniq.push(s); } });
+                        uniq.sort((a, b) => {
+                            const w = s => { s = s.toLowerCase(); if (s.includes('thin')) return 100; if (s.includes('light')) return 300; if (s.includes('regular') || s.includes('normal')) return 400; if (s.includes('medium')) return 500; if (s.includes('semibold')) return 600; if (s.includes('bold')) return 700; if (s.includes('black') || s.includes('heavy')) return 900; return 400; };
+                            return w(a.style) - w(b.style);
+                        });
+                        v.styles = uniq;
+                    });
+                    this.availableFonts = Array.from(familyMap, ([family, v]) => ({ family, displayName: v.fullName, styles: v.styles }));
+                    this.availableFonts.sort((a, b) => a.displayName.localeCompare(b.displayName, 'zh-Hans'));
+                } catch (e) { alert('加载字体失败: ' + e.message); }
+            },
+
+            initFontPanel() {
+                const fontInput = document.getElementById('font-family-input');
+                const fontList = document.getElementById('font-dropdown-list');
+                const fontLoadBtn = document.getElementById('font-load-btn');
+                const fontStyleSelect = document.getElementById('font-style-select');
+                const fontScaleNode = document.getElementById('font-scale');
+                const fontScaleVal = document.getElementById('font-scale-val');
+
+                // Scale slider
+                if (fontScaleNode) {
+                    fontScaleNode.addEventListener('input', (e) => {
+                        this.fontScale = parseFloat(e.target.value) || 1.0;
+                        if (fontScaleVal) fontScaleVal.textContent = Math.round(this.fontScale * 100) + '%';
+                        this.render(false);
+                    });
+                }
+
+                // Populate font styles for a selected family
+                this.populateFontStyles = (familyName) => {
+                    if (!fontStyleSelect) return;
+                    fontStyleSelect.innerHTML = '';
+                    const fontObj = this.availableFonts.find(f => f.family === familyName);
+                    if (!fontObj || !fontObj.styles || fontObj.styles.length === 0) {
+                        fontStyleSelect.innerHTML = '<option value="Regular">Regular</option>';
+                        fontStyleSelect.disabled = true;
+                    } else {
+                        fontStyleSelect.disabled = false;
+                        fontObj.styles.forEach(s => { const opt = document.createElement('option'); opt.value = s.postscriptName; opt.textContent = s.style; fontStyleSelect.appendChild(opt); });
+                    }
+                };
+
+                if (fontStyleSelect) fontStyleSelect.addEventListener('change', () => this.render(false));
+
+                // Render font list items
+                this.renderFonts = (filterKey = '') => {
+                    if (!fontList) return;
+                    let html = '<li class="font-dropdown-item" data-val="sans-serif" style="font-family:sans-serif;">系统默认 (sans-serif)</li>';
+                    const key = filterKey.toLowerCase().trim();
+                    const filtered = key ? this.availableFonts.filter(f => f.family.toLowerCase().includes(key) || f.displayName.toLowerCase().includes(key)) : this.availableFonts;
+                    filtered.forEach(f => { html += `<li class="font-dropdown-item" data-val="${f.family}" style="font-family:'${f.family}',sans-serif;" title="${f.family}">${f.displayName}</li>`; });
+                    if (filtered.length === 0 && key) html += '<li class="font-dropdown-item" style="color:#86868b;pointer-events:none;">无匹配字体, 按回车强制应用</li>';
+                    fontList.innerHTML = html;
+                };
+
+                let hideTimeout; let previewOriginal = null;
+
+                if (fontInput) {
+                    fontInput.addEventListener('focus', () => { this.renderFonts(''); fontList && fontList.classList.add('show'); fontInput.select(); });
+                    fontInput.addEventListener('click', () => fontInput.select());
+                    fontInput.addEventListener('blur', () => {
+                        hideTimeout = setTimeout(() => {
+                            fontList && fontList.classList.remove('show');
+                            if (previewOriginal !== null) { this.fontFamily = previewOriginal; previewOriginal = null; }
+                            if (fontInput) { this.fontFamily = fontInput.value.trim() || 'sans-serif'; if (this.populateFontStyles) this.populateFontStyles(this.fontFamily); }
+                            this.render(false);
+                        }, 200);
+                    });
+                    fontInput.addEventListener('input', (e) => { this.renderFonts(e.target.value); fontList && fontList.classList.add('show'); });
+                    fontInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { fontList && fontList.classList.remove('show'); fontInput.blur(); } });
+                }
+
+                if (fontList) {
+                    fontList.addEventListener('mouseover', (e) => {
+                        const item = e.target.closest('.font-dropdown-item');
+                        if (item && item.dataset.val) { if (previewOriginal === null) previewOriginal = this.fontFamily; this.fontFamily = item.dataset.val; this.render(false); }
+                    });
+                    fontList.addEventListener('mouseleave', () => {
+                        if (previewOriginal !== null) { this.fontFamily = previewOriginal; previewOriginal = null; this.render(false); }
+                    });
+                    fontList.addEventListener('mousedown', (e) => {
+                        const item = e.target.closest('.font-dropdown-item');
+                        if (item && item.dataset.val) {
+                            if (fontInput) fontInput.value = item.dataset.val;
+                            previewOriginal = null;
+                            if (this.populateFontStyles) this.populateFontStyles(item.dataset.val);
+                            this.fontFamily = item.dataset.val;
+                            if (hideTimeout) clearTimeout(hideTimeout);
+                            fontList.classList.remove('show');
+                            this.render(false);
+                        }
+                    });
+                }
+
+                if (fontLoadBtn) {
+                    fontLoadBtn.addEventListener('click', () => {
+                        this.loadSystemFonts().then(() => {
+                            if (fontInput) {
+                                this.renderFonts(fontInput.value === 'sans-serif' ? '' : fontInput.value);
+                                fontInput.focus();
+                                fontList && fontList.classList.add('show');
+                            }
+                        });
+                    });
+                }
+            },
+
+            // ──────────────────────────────────────────────────
+            //  Hardened Precision Scraper — 精密金融数据转换器
+            // ──────────────────────────────────────────────────
+            async aiParse() {
+                const provider = document.getElementById('ai-provider').value;
+                const apiKey = (document.getElementById('ai-apikey')?.value || '').trim();
+                const model = document.getElementById('ai-model').value;
+                let rawText = document.getElementById('data-input').value.trim();
+                const statusEl = document.getElementById('ai-status');
+                const btn = document.getElementById('ai-parse-btn');
+
+                const endpoint = provider === 'deepseek'
+                    ? 'https://api.deepseek.com/chat/completions'
+                    : 'https://api.openkey.red/v1/chat/completions';
+
+                if (!apiKey) { statusEl.textContent = '❌ 请填写 API Key'; statusEl.style.color = '#ff3b30'; return; }
+                if (!rawText) { statusEl.textContent = '❌ 请先粘贴数据'; statusEl.style.color = '#ff3b30'; return; }
+
+                sessionStorage.setItem(`api_key_${provider}`, apiKey);
+
+                btn.disabled = true;
+                const oldText = btn.textContent;
+                btn.textContent = '⏳ AI 正在分析...';
+                statusEl.textContent = '正在发起精密分析 (' + model + ')...';
+                statusEl.style.color = '#86868b';
+
+                // Pre-processing
+                rawText = rawText.replace(/\n\s*\n/g, '\n').trim();
+
+                const systemPrompt = `你现在是【精密金融数据转换器】。你的唯一任务是将乱序的保险利益演示表文本转换为结构化 JSON。
+
+核心规则（优先级最高）：
+1. **严禁拆分逗号**：数字中的逗号（如 500,000）必须作为数值的一部分完整保留，绝对禁止将其视为列分隔符。
+2. **死守 5 列结构**：输出的每一行必须严格对应【保单年度、累计缴费、提取金额、累计提取、账户余额】。
+3. **字符串返回**：为了绝对保留千分位逗号，请将所有数值以“字符串”形式返回（例如 "1,000,000" 而不是 1000000）。
+4. **空值补齐**：如果某列数据缺失，必须使用 "-" 占位，确保 DATA 数组中每一行都有且只有 5 个元素。
+5. **任务流程**：识别‘保单年度’作为行起始锚点，整理后续 4 个对应的财务要素。
+
+返回格式要求（纯 JSON）：
+{
+  "labels": { "sideTitle": "保单年度", "subTitles": ["累计缴费", "提取金额", "累计提取", "账户余额"] },
+  "data": [ ["1", "500,000", "-", "-", "0"], ["2", "1,000,000", "-", "-", "65,340"] ]
+}`;
+
+                try {
+                    const res = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                        body: JSON.stringify({
+                            model: model,
+                            messages: [
+                                { role: 'system', content: systemPrompt },
+                                { role: 'user', content: rawText }
+                            ],
+                            max_tokens: 4096,
+                            temperature: 0.1
+                        })
+                    });
+
+                    const responseData = await res.json();
+                    if (responseData.error) {
+                        statusEl.textContent = '❌ API 错误: ' + (responseData.error.message || JSON.stringify(responseData.error));
+                        statusEl.style.color = '#ff3b30';
+                        return;
+                    }
+
+                    let rawContent = (responseData.choices?.[0]?.message?.content || '').trim();
+                    if (!rawContent) { statusEl.textContent = '❌ AI 未返回内容'; statusEl.style.color = '#ff3b30'; return; }
+
+                    // Robust JSON extraction
+                    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+                    if (!jsonMatch) throw new Error('无法提取 JSON 结构');
+                    const parsed = JSON.parse(jsonMatch[0]);
+
+                    if (!parsed.labels || !parsed.data) throw new Error('JSON 字段缺失');
+
+                    const headers = [parsed.labels.sideTitle, ...parsed.labels.subTitles];
+                    const rows = parsed.data.map(row => {
+                        // Strict padding to 5 columns
+                        const r = [...row];
+                        while (r.length < 5) r.push('-');
+                        return r.slice(0, 5);
+                    });
+
+                    // Build CSV output with protective quotes for commas
+                    const escape = val => {
+                        let s = String(val);
+                        if (/[,\n"]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+                        return s;
+                    };
+                    const csvLines = [headers.map(escape).join(',')];
+                    rows.forEach(row => csvLines.push(row.map(escape).join(',')));
+
+                    document.getElementById('data-input').value = csvLines.join('\n');
+
+                    // Immediate Update
+                    this.render(true);
+
+                    statusEl.textContent = `✅ 精密解析成功 (${rows.length} 行)`;
+                    statusEl.style.color = '#34c759';
+                    statusEl.classList.remove('success-toast');
+                    void statusEl.offsetWidth;
+                    statusEl.classList.add('success-toast');
+
+                } catch (e) {
+                    console.error('AI Parse Error:', e);
+                    statusEl.textContent = '❌ 解析失败: ' + (e.message || e);
+                    statusEl.style.color = '#ff3b30';
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = oldText;
+                }
+            },
+
+            async parseData(rawText) {
+                // 本地解析 fallback
+                return this.parseInputData(rawText);
+            },
+
+            // ──────────────────────────────────────────────────
+            //  GET CONFIG from UI
+            // ──────────────────────────────────────────────────
+            getConfig() {
+                return {
+                    primaryColor: document.getElementById('cfg-color').value,
+                    fontFamily: this.fontFamily || 'sans-serif',
+                    fontScale: this.fontScale || 1.0,
+                    colWidthRatio: parseFloat(document.getElementById('cfg-colwidth').value),
+                    rowHeight: parseInt(document.getElementById('cfg-rowheight').value),
+                    headerFontSize: parseInt(document.getElementById('cfg-hfontsize').value),
+                    bodyFontSize: parseInt(document.getElementById('cfg-bfontsize').value),
+                    transparent: document.getElementById('cfg-transparent').checked,
+                };
+            },
+
+            // ──────────────────────────────────────────────────
+            //  BUILD ECHARTS OPTION — custom series table
+            //  ★ Core: uses type:'custom' + renderItem
+            // ──────────────────────────────────────────────────
+            // renderMode: 'normal' | 'textOnly' | 'bgOnly'
+            buildTableOption(data, config, renderMode = 'normal') {
+                if (!data || !data.headers || !data.rows) return null;
+
+                const { headers, rows } = data;
+                const COLS = headers.length;
+                const ROWS = rows.length;
+                const TOTAL_ROWS = ROWS + 1; // +1 for header
+
+                const ROW_H = config.rowHeight;
+                const TABLE_H = TOTAL_ROWS * ROW_H;
+                const COL_W = Math.floor((this.state.width * 0.88) / COLS) * config.colWidthRatio;
+                const TABLE_W = COL_W * COLS;
+                const OFFSET_X = (this.state.width - TABLE_W) / 2;
+                const OFFSET_Y = Math.max(60, (this.state.height - TABLE_H) / 2 - 40);
+
+                // Lighter/darker from primary for alternating rows
+                const hexToRgb = (hex) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return [r, g, b];
+                };
+                const [pr, pg, pb] = hexToRgb(config.primaryColor);
+                const headerBg = config.primaryColor;
+                const headerTextColor = '#FFFFFF';
+                const rowEvenBg = '#FFFFFF';
+                const rowOddBg = `rgba(${pr}, ${pg}, ${pb}, 0.04)`;
+                const borderColor = `rgba(${pr}, ${pg}, ${pb}, 0.12)`;
+                const cellTextColor = '#1d1d1f';
+
+                // Build flat data: [rowIndex, colIndex, cellValue, isHeader]
+                const seriesData = [];
+                // Header row (index 0)
+                for (let c = 0; c < COLS; c++) {
+                    seriesData.push([0, c, headers[c], 1]);
+                }
+                // Data rows (index 1..ROWS)
+                for (let r = 0; r < ROWS; r++) {
+                    for (let c = 0; c < COLS; c++) {
+                        seriesData.push([r + 1, c, rows[r][c], 0]);
+                    }
+                }
+
+                // ★ Custom series renderItem — THE CORE RENDERING ENGINE
+                // This draws each table cell as a group of rect + text
+                const renderItem = (params, api) => {
+                    const rowIdx = api.value(0);
+                    const colIdx = api.value(1);
+                    const cellText = api.value(2);
+                    const isHeader = api.value(3);
+
+                    const x = OFFSET_X + colIdx * COL_W;
+                    const y = OFFSET_Y + rowIdx * ROW_H;
+
+                    // Determine cell background
+                    let bgColor;
+                    if (isHeader) {
+                        bgColor = headerBg;
+                    } else {
+                        bgColor = (rowIdx % 2 === 0) ? rowOddBg : rowEvenBg;
+                    }
+
+                    // Build group of children
+                    const children = [];
+
+                    // ① Cell background rect (skip in textOnly mode)
+                    if (renderMode !== 'textOnly') {
+                        children.push({
+                            type: 'rect',
+                            shape: { x: x, y: y, width: COL_W, height: ROW_H },
+                            style: {
+                                fill: bgColor,
+                                stroke: borderColor,
+                                lineWidth: 0.5,
+                            },
+                            ...(isHeader && colIdx === 0 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [8, 0, 0, 0] } } : {}),
+                            ...(isHeader && colIdx === COLS - 1 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 8, 0, 0] } } : {}),
+                            ...(!isHeader && rowIdx === ROWS && colIdx === 0 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 0, 0, 8] } } : {}),
+                            ...(!isHeader && rowIdx === ROWS && colIdx === COLS - 1 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 0, 8, 0] } } : {}),
+                        });
+                    }
+
+                    // ② Cell text (skip in bgOnly mode)
+                    if (renderMode !== 'bgOnly') {
+                        children.push({
+                            type: 'text',
+                            style: {
+                                x: x + COL_W / 2,
+                                y: y + ROW_H / 2,
+                                text: String(cellText),
+                                fill: isHeader ? headerTextColor : cellTextColor,
+                                font: `${isHeader ? 'bold' : 'normal'} ${Math.round((isHeader ? config.headerFontSize : config.bodyFontSize) * (config.fontScale || 1))}px ${config.fontFamily}`,
+                                textAlign: 'center',
+                                textVerticalAlign: 'middle',
+                                truncate: { outerWidth: COL_W - 12, ellipsis: '…' },
+                            },
+                        });
+                    }
+
+                    return {
+                        type: 'group',
+                        children: children,
+                    };
+                };
+
+                // ★ ECharts option using custom series
+                // Background logic per render mode
+                let optBg;
+                if (renderMode === 'textOnly') optBg = 'transparent';
+                else if (renderMode === 'bgOnly') optBg = config.transparent ? 'transparent' : '#FFFFFF';
+                else optBg = config.transparent ? 'transparent' : '#FFFFFF';
+
+                const option = {
+                    backgroundColor: optBg,
+                    animation: true,
+                    animationDuration: 600,
+                    animationEasing: 'cubicOut',
+                    // No axis / grid — pure custom rendering
+                    xAxis: { show: false, min: 0, max: this.state.width },
+                    yAxis: { show: false, min: 0, max: this.state.height, inverse: true },
+                    grid: { left: 0, right: 0, top: 0, bottom: 0, containLabel: false },
+                    tooltip: { show: false },
+                    series: [{
+                        type: 'custom',
+                        renderItem: renderItem,
+                        data: seriesData,
+                        // Each data point has 4 dimensions: [rowIdx, colIdx, text, isHeader]
+                        encode: { x: 1, y: 0 },
+                        coordinateSystem: 'cartesian2d',
+                        z: 10,
+                    }],
+                    // Title removed per user request
+                    title: { show: false },
+                };
+
+                return option;
+            },
+
+            // ──────────────────────────────────────────────────
+            //  RENDER — main reactive binding
+            // ──────────────────────────────────────────────────
+            render(isFullReset = false) {
+                const statusEl = document.getElementById('parse-status');
+                const raw = document.getElementById('data-input').value;
+                const data = this.parseInputData(raw);
+
+                if (!data) {
+                    if (statusEl) { statusEl.textContent = '⚠️ 无法解析数据，请检查格式'; statusEl.style.color = '#ff3b30'; }
+                    return;
+                }
+
+                if (statusEl) {
+                    statusEl.textContent = `✅ 已解析 ${data.headers.length} 列 × ${data.rows.length} 行`;
+                    statusEl.style.color = '#34c759';
+                }
+
+                // Auto-fit canvas if 'auto' is selected
+                const canvasMode = document.getElementById('cfg-canvas').value;
+                if (canvasMode === 'auto') this.autoFitToData(data);
+
+                const config = this.getConfig();
+                const option = this.buildTableOption(data, config);
+
+                if (!option) return;
+
+                // Update chart container background
+                const container = document.getElementById('chart-container');
+                container.style.background = config.transparent ? 'repeating-conic-gradient(#e0e0e0 0% 25%, #fff 0% 50%) 0 0/20px 20px' : '#FFFFFF';
+
+                if (isFullReset) this.chart.clear();
+                this.chart.setOption(option, { notMerge: isFullReset });
+            },
+
+            // ──────────────────────────────────────────────────
+            //  CLEAR DATA
+            // ──────────────────────────────────────────────────
+            clearData() {
+                document.getElementById('data-input').value = '';
+                document.getElementById('parse-status').textContent = '';
+                this.chart.clear();
+            },
+
+            // ──────────────────────────────────────────────────
+            //  HD EXPORT — 300dpi (pixelRatio ≈ 4)
+            // ──────────────────────────────────────────────────
+            getPixelRatio() {
+                return Math.max(1, parseInt(document.getElementById('cfg-quality').value || '2', 10));
+            },
+
+            base64ToBlob(b64) {
+                const bin = atob(b64);
+                const arr = new Uint8Array(bin.length);
+                for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+                return new Blob([arr], { type: 'image/png' });
+            },
+
+            exportHD() {
+                if (!this.chart) return;
+                const fileName = document.getElementById('cfg-filename').value.trim() || 'ECharts_Table';
+                const pr = this.getPixelRatio();
+                const label = pr >= 8 ? '8K' : '4K';
+                const currentOpt = this.chart.getOption();
+                let bg = currentOpt.backgroundColor;
+                if (Array.isArray(bg)) bg = bg[0];
+                if (!bg || bg === 'transparent') bg = '#FFFFFF';
+
+                try {
+                    const dataUrl = this.chart.getDataURL({ type: 'png', pixelRatio: pr, backgroundColor: bg });
+                    const blob = this.base64ToBlob(dataUrl.split(',')[1]);
+                    saveAs(blob, `${fileName}_${label}.png`);
+                } catch (e) {
+                    alert('导出失败: ' + (e.message || e));
+                }
+            },
+
+            exportTransparent() {
+                if (!this.chart) return;
+                const fileName = document.getElementById('cfg-filename').value.trim() || 'ECharts_Table';
+                const pr = this.getPixelRatio();
+                const label = pr >= 8 ? '8K' : '4K';
+
+                try {
+                    const dataUrl = this.chart.getDataURL({ type: 'png', pixelRatio: pr, backgroundColor: 'transparent' });
+                    const blob = this.base64ToBlob(dataUrl.split(',')[1]);
+                    saveAs(blob, `${fileName}_transparent_${label}.png`);
+                } catch (e) {
+                    alert('导出失败: ' + (e.message || e));
+                }
+            },
+
+            // ──────────────────────────────────────────────────
+            //  OFFSCREEN RENDER for split export
+            // ──────────────────────────────────────────────────
+            _renderOffscreen(data, config, renderMode, bgColor, pixelRatio) {
+                return new Promise((resolve, reject) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = `position:fixed;left:-99999px;top:-99999px;width:${this.state.width}px;height:${this.state.height}px;pointer-events:none;opacity:0;`;
+                    document.body.appendChild(div);
+                    let offChart = null;
+                    try {
+                        offChart = echarts.init(div, null, { renderer: 'canvas', devicePixelRatio: 2 });
+                        const option = this.buildTableOption(data, config, renderMode);
+                        if (!option) throw new Error('构建 option 失败');
+                        option.animation = false;
+                        option.backgroundColor = bgColor;
+                        offChart.setOption(option, { notMerge: true });
+
+                        const capture = () => {
+                            try {
+                                const url = offChart.getDataURL({ type: 'png', pixelRatio, backgroundColor: bgColor });
+                                offChart.dispose(); document.body.removeChild(div);
+                                resolve(url.split(',')[1]);
+                            } catch (err) {
+                                offChart.dispose(); document.body.removeChild(div); reject(err);
+                            }
+                        };
+                        let done = false;
+                        const once = () => { if (!done) { done = true; capture(); } };
+                        requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(once, 150)));
+                        setTimeout(once, 2000);
+                    } catch (err) {
+                        if (offChart) try { offChart.dispose(); } catch (_) { }
+                        try { document.body.removeChild(div); } catch (_) { }
+                        reject(err);
+                    }
+                });
+            },
+
+            // ──────────────────────────────────────────────────
+            //  SPLIT ZIP EXPORT: bg-only + text-only
+            // ──────────────────────────────────────────────────
+            async exportSplitZip() {
+                if (!this.chart) return;
+                if (typeof JSZip === 'undefined') { alert('JSZip 未加载，请刷新页面'); return; }
+                const btn = document.getElementById('export-zip-btn');
+                const statusEl = document.getElementById('export-status');
+                const fileName = document.getElementById('cfg-filename').value.trim() || 'ECharts_Table';
+                const pr = this.getPixelRatio();
+                const label = pr >= 8 ? '8K' : '4K';
+                const raw = document.getElementById('data-input').value;
+                const data = this.parseInputData(raw);
+                if (!data) { if (statusEl) statusEl.textContent = '⚠️ 无数据可导出'; return; }
+                const config = this.getConfig();
+
+                btn.disabled = true; btn.textContent = '⏳ 导出中...';
+                if (statusEl) { statusEl.textContent = '正在渲染「仅背景」...'; statusEl.style.color = '#86868b'; }
+
+                try {
+                    // Step 1: background only
+                    const bgB64 = await this._renderOffscreen(data, config, 'bgOnly', '#FFFFFF', pr);
+                    if (statusEl) statusEl.textContent = '正在渲染「仅文字」...';
+
+                    // Step 2: text only
+                    const txtB64 = await this._renderOffscreen(data, config, 'textOnly', 'transparent', pr);
+                    if (statusEl) statusEl.textContent = '正在打包 ZIP...';
+
+                    // Step 3: pack ZIP
+                    const zip = new JSZip();
+                    const folder = zip.folder(fileName);
+                    folder.file(`仅背景_${label}.png`, bgB64, { base64: true });
+                    folder.file(`仅文字_${label}.png`, txtB64, { base64: true });
+                    const blob = await zip.generateAsync({ type: 'blob' });
+                    saveAs(blob, `${fileName}_背景与文字_${label}.zip`);
+
+                    if (statusEl) { statusEl.textContent = '✅ ZIP 导出成功（含2张图）'; statusEl.style.color = '#34c759'; }
+                } catch (e) {
+                    if (statusEl) { statusEl.textContent = '❌ 导出失败: ' + (e.message || e); statusEl.style.color = '#ff3b30'; }
+                } finally {
+                    btn.disabled = false; btn.textContent = '📦 导出「仅背景」+「仅文字」ZIP';
+                }
+            },
+
+            // ──────────────────────────────────────────────────
+            //  AUTO-FIT CANVAS TO DATA
+            // ──────────────────────────────────────────────────
+            autoFitToData(data) {
+                if (!data) return;
+                const cols = data.headers.length;
+                const rows = data.rows.length;
+                const config = this.getConfig();
+                const ROW_H = config.rowHeight;
+                const TOTAL_ROWS = rows + 1;
+                // Calculate ideal width: ~180px per column, min 800
+                const idealW = Math.max(800, Math.min(2400, cols * 180));
+                // Calculate ideal height: table height + title space + padding
+                const tableH = TOTAL_ROWS * ROW_H;
+                const idealH = Math.max(600, Math.min(4000, tableH + 160));
+
+                if (this.state.width !== idealW || this.state.height !== idealH) {
+                    this.state.width = idealW; this.state.height = idealH;
+                    const dom = document.getElementById('chart-container');
+                    dom.style.width = idealW + 'px'; dom.style.height = idealH + 'px';
+                    if (this.chart) this.chart.resize({ width: idealW, height: idealH });
+                    this.autoFit();
+                }
+            },
+
+            // ──────────────────────────────────────────────────
+            //  CANVAS SIZE
+            // ──────────────────────────────────────────────────
+            applyCanvasSize() {
+                const val = document.getElementById('cfg-canvas').value;
+                if (val === 'auto') { this.render(true); return; }
+                const parts = val.split(',');
+                const w = parseInt(parts[0]); const h = parseInt(parts[1]);
+                if (!isNaN(w) && !isNaN(h)) { this.state.width = w; this.state.height = h; }
+                const dom = document.getElementById('chart-container');
+                dom.style.width = this.state.width + 'px';
+                dom.style.height = this.state.height + 'px';
+                if (this.chart) this.chart.resize({ width: this.state.width, height: this.state.height });
+                this.autoFit();
+                this.render(true);
+            },
+
+            // ──────────────────────────────────────────────────
+            //  ZOOM & PAN CONTROLS
+            // ──────────────────────────────────────────────────
+            zoom(delta) {
+                this.state.viewScale = Math.min(5, Math.max(0.05, this.state.viewScale + delta));
+                this.updateTransform();
+            },
+            resetZoom() { this.state.viewScale = 1; this.state.viewX = 0; this.state.viewY = 0; this.updateTransform(); },
+            autoFit() {
+                const wrap = document.getElementById('preview-stage');
+                this.state.viewScale = Math.min(
+                    (wrap.clientWidth - 80) / this.state.width,
+                    (wrap.clientHeight - 80) / this.state.height
+                );
+                this.state.viewX = 0; this.state.viewY = 0;
+                this.updateTransform();
+            },
+            updateTransform() {
+                const dom = document.getElementById('chart-container');
+                dom.style.transform = `translate(${this.state.viewX}px, ${this.state.viewY}px) scale(${this.state.viewScale})`;
+                document.getElementById('zoom-level').textContent = Math.round(this.state.viewScale * 100) + '%';
+            },
+
+            initCanvasControl() {
+                const stage = document.getElementById('preview-stage');
+                const chartDom = document.getElementById('chart-container');
+                let isDragging = false, startX, startY, isSpacePressed = false;
+
+                stage.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    this.zoom(e.deltaY > 0 ? -0.05 : 0.05);
+                }, { passive: false });
+
+                window.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && !e.repeat && !['TEXTAREA', 'INPUT'].includes(document.activeElement.tagName)) {
+                        isSpacePressed = true; stage.style.cursor = 'grab'; chartDom.style.pointerEvents = 'none';
+                    }
+                });
+                window.addEventListener('keyup', (e) => {
+                    if (e.code === 'Space') { isSpacePressed = false; stage.style.cursor = ''; chartDom.style.pointerEvents = 'auto'; }
+                });
+
+                stage.addEventListener('mousedown', (e) => {
+                    if (e.button === 1 || (e.button === 0 && isSpacePressed) || (e.button === 0 && e.target === stage)) {
+                        isDragging = true;
+                        startX = e.clientX - this.state.viewX;
+                        startY = e.clientY - this.state.viewY;
+                        stage.style.cursor = 'grabbing';
+                        e.preventDefault();
+                    }
+                });
+                window.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    e.preventDefault();
+                    this.state.viewX = e.clientX - startX;
+                    this.state.viewY = e.clientY - startY;
+                    this.updateTransform();
+                });
+                window.addEventListener('mouseup', () => {
+                    if (isDragging) { isDragging = false; stage.style.cursor = isSpacePressed ? 'grab' : ''; }
+                });
+            },
+        };
+
+        window.onload = () => App.init();
+    </script>
+
+</body>
+
+</html>
