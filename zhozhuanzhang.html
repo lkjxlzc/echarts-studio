@@ -571,6 +571,45 @@
         .finetune-color-row.dragging {
             opacity: 0.4;
         }
+
+        /* ── Page Navigation Segmented Control ── */
+        .page-nav-bar {
+            display: flex;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 10px;
+            padding: 3px;
+            margin-bottom: 12px;
+        }
+
+        .page-nav-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 4px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #86868b;
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .page-nav-item:hover {
+            color: #1d1d1f;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .page-nav-item.active {
+            background: #fff;
+            color: #007aff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -582,6 +621,12 @@
 
         <!-- Header -->
         <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-apple-border bg-white/90 fade-up">
+            <!-- Page Navigation -->
+            <div class="page-nav-bar">
+                <a class="page-nav-item" href="Echart.html">🎬 视频导出</a>
+                <a class="page-nav-item" href="table.html">📸 图片导出</a>
+                <a class="page-nav-item active" href="zhozhuanzhang.html">📐 矩形生成</a>
+            </div>
             <div class="flex items-center justify-between mb-1">
                 <h1 class="text-xl font-bold tracking-tight">
                     矩形图片 <span class="text-apple-blue">生成器</span>
@@ -1008,15 +1053,7 @@
                 <p id="export-status" class="text-[10px] text-apple-tertiary mt-2 text-center min-h-[14px]"></p>
             </section>
 
-            <!-- ── Quick Links ── -->
-            <div class="text-center py-2 fade-up" style="animation-delay:0.25s">
-                <a href="Echart.html"
-                    class="text-[12px] text-apple-blue font-medium hover:opacity-70 transition-opacity">← 返回 ECharts
-                    Studio</a>
-                <span class="text-apple-tertiary mx-2">|</span>
-                <a href="table.html"
-                    class="text-[12px] text-apple-blue font-medium hover:opacity-70 transition-opacity">表格导出工具 →</a>
-            </div>
+
         </div>
     </aside>
 

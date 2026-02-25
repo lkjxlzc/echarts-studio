@@ -577,6 +577,45 @@
             background: var(--accent);
             color: #fff;
         }
+
+        /* ── Page Navigation Segmented Control ── */
+        .page-nav-bar {
+            display: flex;
+            gap: 2px;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 10px;
+            padding: 3px;
+            margin-bottom: 12px;
+        }
+
+        .page-nav-item {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            padding: 8px 4px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #86868b;
+            text-decoration: none;
+            transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .page-nav-item:hover {
+            color: #1d1d1f;
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .page-nav-item.active {
+            background: #fff;
+            color: #007aff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+            pointer-events: none;
+        }
     </style>
 </head>
 
@@ -607,15 +646,15 @@
     </div>
 
     <div id="sidebar">
-        <div class="sidebar-header" style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <h1>图片导出</h1>
-                <div style="font-size:12px; color:#86868b; margin-top:4px;">编辑代码 → 运行预览 → 导出图片</div>
+        <div class="sidebar-header">
+            <!-- Page Navigation -->
+            <div class="page-nav-bar">
+                <a class="page-nav-item" href="Echart.html">🎬 视频导出</a>
+                <a class="page-nav-item active" href="table.html">📸 图片导出</a>
+                <a class="page-nav-item" href="zhozhuanzhang.html">📐 矩形生成</a>
             </div>
-            <div style="display:flex; gap:12px; align-items:center;">
-                <a class="nav-link" href="Echart.html">🎬 视频导出</a>
-                <a class="nav-link" href="zhozhuanzhang.html">🔄 中转器</a>
-            </div>
+            <h1>图片导出</h1>
+            <div style="font-size:12px; color:#86868b; margin-top:4px;">编辑代码 → 运行预览 → 导出图片</div>
         </div>
 
         <div class="sidebar-scroll">
