@@ -991,32 +991,6 @@
                         class="w-full">
                 </div>
 
-                <!-- ── JS 代码注入区 ── -->
-                <div class="mb-4 mt-2">
-                    <div class="flex items-center justify-between mb-1.5 flex-wrap gap-2">
-                        <label class="text-[12px] font-medium text-apple-secondary">JS 高级定制 (option)</label>
-                        <div class="flex gap-2 flex-wrap">
-                            <button onclick="App.showGeneratedCode()"
-                                class="btn-spring px-2 py-1 bg-purple-50 text-purple-600 rounded text-[10px] font-semibold hover:bg-purple-100">👁
-                                显示代码</button>
-                            <button onclick="App.runCode(false)"
-                                class="btn-spring px-2 py-1 bg-apple-blue/10 text-apple-blue rounded text-[10px] font-semibold hover:bg-apple-blue/20">▶
-                                运行</button>
-                            <button onclick="App.copyCode()"
-                                class="btn-spring px-2 py-1 bg-black/[0.04] text-apple-text rounded text-[10px] hover:bg-black/[0.08]">📋
-                                复制</button>
-                            <button onclick="App.resetCode()"
-                                class="btn-spring px-2 py-1 bg-red-50 text-red-500 rounded text-[10px] hover:bg-red-100">↺
-                                重置</button>
-                        </div>
-                    </div>
-                    <textarea id="code-area" spellcheck="false"
-                        class="w-full h-32 px-3 py-2 rounded-lg border border-black/10 bg-[#1e1e1e] text-[#d4d4d4] text-[11px] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue transition-all resize-y"
-                        placeholder="// 在此可用 JS 修改 option
-// 例如: option.backgroundColor = '#000';
-// 修改生效后点击运行。"></textarea>
-                    <p id="code-status" class="text-[10px] mt-1 min-h-[14px] text-apple-tertiary"></p>
-                </div>
 
                 <!-- Export Quality -->
                 <div class="mb-4">
@@ -1674,6 +1648,30 @@
                     }],
                     title: { show: false },
                 };
+
+                // ★ Fix white corner gap: add a header-colored background rect
+                // that covers from the very top of the canvas through the header row,
+                // so the rounded-corner clip in export has no white gaps.
+                const R = config.borderRadius || 0;
+                if (R > 0 && renderMode !== 'textOnly') {
+                    // Bottom row background color (same logic as renderItem)
+                    const lastRowBg = (ROWS % 2 === 0) ? rowOddBg : rowEvenBg;
+                    const bottomY = OFFSET_Y + ROWS * ROW_H; // y of last data row
+                    option.graphic = [
+                        // Top: header bg from canvas top through header row
+                        {
+                            type: 'rect', z: 5, silent: true,
+                            shape: { x: 0, y: 0, width: this.state.width, height: OFFSET_Y + ROW_H, r: [R, R, 0, 0] },
+                            style: { fill: headerBg }
+                        },
+                        // Bottom: last row bg from last row to canvas bottom
+                        {
+                            type: 'rect', z: 5, silent: true,
+                            shape: { x: 0, y: bottomY, width: this.state.width, height: this.state.height - bottomY, r: [0, 0, R, R] },
+                            style: { fill: lastRowBg }
+                        }
+                    ];
+                }
 
                 // ★ Inject user JS logic if any directly onto option
                 const codeEl = document.getElementById('code-area');
