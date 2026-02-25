@@ -1437,7 +1437,17 @@
                 const templateCode = document.getElementById('deepseek-template').value.trim();
                 const isCustom = this._deepseekMode === 'custom';
 
-                const systemPromptText = '你是一个 ECharts 图表配置专家。根据用户提供的数据和/或图片，只输出一段可运行的 JavaScript 代码，且必须满足：1) 代码中只定义一个变量 option，即 option = { ... }; 2) 使用 ECharts 5 的配置项，不要使用 echarts.init 等，只给 option 对象；3) 若用户提供的是图片，请识别图片中的图表类型、坐标轴、数据点或表格内容，并据此生成 option；4) 若用户数据是 CSV 或表格，请解析后填入 series.data 或 xAxis.data；5) 不要输出 markdown 代码块标记，只输出纯 JavaScript 的 option = { ... }; 一行或数行。若用户提供了模板代码，请在其基础上结合数据生成最终 option。';
+                const systemPromptText = '你是一个 ECharts 图表配置专家。根据用户提供的数据和/或图片，只输出一段可运行的 JavaScript 代码，且必须满足：' +
+                    '1) 代码中只定义一个变量 option，即 option = { ... };  ' +
+                    '2) 使用 ECharts 5 的配置项，不要使用 echarts.init 等，只给 option 对象；' +
+                    '3) 若用户提供的是图片，请识别图片中的图表类型、坐标轴、数据点或表格内容，并据此生成 option；' +
+                    '4) 若用户数据是 CSV 或表格，请解析后填入 series.data 或 xAxis.data；' +
+                    '5) 不要输出 markdown 代码块标记，只输出纯 JavaScript 的 option = { ... }; 一行或数行。若用户提供了模板代码，请在其基础上结合数据生成最终 option。' +
+                    '\n\n【数据解析铁律——严格遵守】' +
+                    '\nA) 列分隔符：必须使用竖线 "|" 作为列分隔符，严禁使用逗号作为分隔符。' +
+                    '\nB) 千分位保护：数字中的逗号（如 500,000 或 1,234,567）是千分位分隔符，属于同一个数值的一部分，绝对不能拆开成多列。在输出数据时保留原始数值（去掉千分位逗号），例如 500,000 => 500000。' +
+                    '\nC) 补齐行数据：如果某行数据不足预期列数，必须用 "-" 或 0 补齐缺失列，确保每行列数一致、表格结构完整。' +
+                    '\nD) 数据类型自动转换：所有看起来是数字的字段（即使带有千分位逗号或百分号）都应转为纯数值填入 data 数组。';
                 let userContent;
                 if (imageFile) {
                     const dataUrl = await this.readFileAsDataURL(imageFile);
@@ -1755,15 +1765,28 @@
 
             async captureSmart() {
                 const btn = document.getElementById('btn-capture') || document.querySelector('button[onclick*="captureSmart"]');
-                const old = btn.innerText; btn.innerText = "4K 截图中..."; btn.disabled = true;
-                await new Promise(r => setTimeout(r, 100));
+                const old = btn.innerText; btn.innerText = "高清截图中..."; btn.disabled = true;
                 const fileName = this.getExportFileName();
                 const dom = document.getElementById('chart-container');
+
+                // ── 临时关闭动画，让图表瞬间处于最终状态 ──
                 const currentOpt = this.chart.getOption();
                 const bg = currentOpt.backgroundColor && currentOpt.backgroundColor !== 'auto' ? currentOpt.backgroundColor : '#ffffff';
+                this.chart.setOption({ animation: false }, { notMerge: false });
+
+                // ── 等待 ECharts 渲染完成（finished 事件 + 300ms 双重保险）──
+                await new Promise(resolve => {
+                    const onFinish = () => {
+                        this.chart.off('finished', onFinish);
+                        setTimeout(resolve, 300);
+                    };
+                    this.chart.on('finished', onFinish);
+                    // 防止 finished 不触发（图表已是终态时），加超时兜底
+                    setTimeout(() => { this.chart.off('finished', onFinish); resolve(); }, 1000);
+                });
+
                 try {
                     if (this.isFrozen) {
-                        // 标签已固定时：用 html2canvas 截整个容器，才能包含 tooltip 层
                         const savedTransform = dom.style.transform;
                         const savedPosition = dom.style.position;
                         const savedLeft = dom.style.left;
@@ -1776,7 +1799,7 @@
                         dom.style.zIndex = '99999';
                         await new Promise(r => requestAnimationFrame(r));
                         const canvas = await html2canvas(dom, {
-                            scale: 2, backgroundColor: bg, logging: false, useCORS: true,
+                            scale: 3, backgroundColor: bg, logging: false, useCORS: true,
                             width: this.state.width, height: this.state.height
                         });
                         dom.style.transform = savedTransform;
@@ -1786,8 +1809,9 @@
                         dom.style.zIndex = savedZIndex;
                         canvas.toBlob(blob => saveAs(blob, `${fileName}.png`));
                     } else {
+                        // pixelRatio: 3 高清导出
                         const dataUrl = this.chart.getDataURL({
-                            type: 'png', pixelRatio: 2, backgroundColor: bg, excludeComponents: ['toolbox']
+                            type: 'png', pixelRatio: 3, backgroundColor: bg, excludeComponents: ['toolbox']
                         });
                         const base64 = dataUrl.split(',')[1];
                         const bin = atob(base64);
@@ -1797,10 +1821,116 @@
                         saveAs(blob, `${fileName}.png`);
                     }
                 } catch (e) { alert("截图失败：" + (e && e.message ? e.message : e)); }
+
+                // ── 恢复动画 ──
+                this.chart.setOption({ animation: true }, { notMerge: false });
                 btn.innerText = old; btn.disabled = false;
             },
 
 
+
+            // ── 智能数据插值（模拟 ECharts 原生动画效果） ──
+            // line/area → 从左到右逐步显现（smooth 插值）
+            // bar/scatter/其他 → 数据从 0 长到最终值
+            _interpolateForExport(option, t) {
+                if (!option.series) return;
+                option.series.forEach(series => {
+                    if (!series.data || series.data.length === 0) return;
+                    const type = series.type || 'line';
+                    const total = series.data.length;
+                    const getNum = (d) => {
+                        if (typeof d === 'number') return d;
+                        if (d && typeof d === 'object' && typeof d.value === 'number') return d.value;
+                        if (Array.isArray(d)) { for (let i = d.length - 1; i >= 0; i--) if (typeof d[i] === 'number') return d[i]; }
+                        return null;
+                    };
+                    const setNum = (d, v) => {
+                        if (typeof d === 'number') return v;
+                        if (d && typeof d === 'object' && typeof d.value === 'number') return Object.assign({}, d, { value: v });
+                        if (Array.isArray(d)) { const c = d.slice(); for (let i = c.length - 1; i >= 0; i--) { if (typeof c[i] === 'number') { c[i] = v; break; } } return c; }
+                        return d;
+                    };
+
+                    if (type === 'line') {
+                        // 从左到右逐步显现，最后一个可见点做平滑插值
+                        const progress = t * total;           // 如 t=0.5, total=20 → 10.0
+                        const fullVisible = Math.floor(progress);
+                        const frac = progress - fullVisible;   // 小数部分，用于插值
+
+                        series.data = series.data.map((d, i) => {
+                            if (i < fullVisible) return d;     // 完全可见
+                            if (i === fullVisible) {
+                                // 平滑插值：在前一个值和当前值之间
+                                const cur = getNum(d);
+                                if (cur === null) return d;
+                                if (i === 0) return setNum(d, cur * frac);
+                                const prev = getNum(series.data[i - 1]);
+                                if (prev === null) return setNum(d, cur * frac);
+                                return setNum(d, prev + (cur - prev) * frac);
+                            }
+                            return null;                       // 尚未显现
+                        });
+                    } else {
+                        // bar/scatter/pie/其他：数据从 0 缩放到最终值
+                        series.data = series.data.map(d => {
+                            const v = getNum(d);
+                            if (v === null) return d;
+                            return setNum(d, v * t);
+                        });
+                    }
+                });
+            },
+
+            // ── 缓动函数表 ──
+            _easingFn(name) {
+                const fns = {
+                    linear: t => t,
+                    quadraticOut: t => t * (2 - t),
+                    cubicOut: t => 1 - Math.pow(1 - t, 3),
+                    cubicInOut: t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+                    quarticOut: t => 1 - Math.pow(1 - t, 4),
+                    quinticOut: t => 1 - Math.pow(1 - t, 5),
+                    sinusoidalOut: t => Math.sin(t * Math.PI / 2),
+                    exponentialOut: t => t === 1 ? 1 : 1 - Math.pow(2, -10 * t),
+                    circularOut: t => Math.sqrt(1 - (t - 1) * (t - 1)),
+                    bounceOut: t => {
+                        if (t < 1 / 2.75) return 7.5625 * t * t;
+                        if (t < 2 / 2.75) return 7.5625 * (t -= 1.5 / 2.75) * t + .75;
+                        if (t < 2.5 / 2.75) return 7.5625 * (t -= 2.25 / 2.75) * t + .9375;
+                        return 7.5625 * (t -= 2.625 / 2.75) * t + .984375;
+                    },
+                    backOut: t => { const s = 1.70158; return (t -= 1) * t * ((s + 1) * t + s) + 1; },
+                };
+                return fns[name] || fns.linear;
+            },
+
+            // ── 解析用户 option 代码 ──
+            _parseUserOption() {
+                const code = document.getElementById('code-area').value;
+                const fn = new Function('var option; ' + code + ' return option;');
+                return fn();
+            },
+
+            // ── 对 option 施加与 runCode 相同的样式处理（不含动画相关） ──
+            _applyOptionStyle(option) {
+                if (!option.backgroundColor || option.backgroundColor === 'auto') option.backgroundColor = '#ffffff';
+                this.deepScale(option);
+                this.applyGlobalFontScale(option);
+                if (!option.title) option.title = {};
+                const showTitle = document.getElementById('title-show').checked;
+                option.title.show = showTitle;
+                if (showTitle) {
+                    const titleText = document.getElementById('title-text').value;
+                    if (titleText) option.title.text = titleText;
+                    const titleSize = parseInt(document.getElementById('title-size').value);
+                    if (!option.title.textStyle) option.title.textStyle = {};
+                    option.title.textStyle.fontSize = titleSize;
+                    option.title.top = document.getElementById('title-top').value + '%';
+                    option.title.left = 'center';
+                }
+                if (!option.tooltip) option.tooltip = {};
+                option.tooltip.show = false;
+            },
 
             async startCinemaExport() {
                 if (this.isExporting) return;
@@ -1813,80 +1943,135 @@
                 const userSeconds = parseFloat(document.getElementById('anim-duration').value);
                 const fps = parseInt(document.getElementById('export-fps').value) || 60;
                 const totalFrames = Math.ceil(userSeconds * fps);
-                const SLOW_FACTOR = 20;
-                const captureInterval = (1000 / fps) * SLOW_FACTOR;
+                const easingName = document.getElementById('anim-easing').value || 'cubicOut';
+                const easeFn = this._easingFn(easingName);
 
                 const zip = new JSZip();
                 const fileName = this.getExportFileName();
                 const folder = zip.folder(fileName);
 
-                // ── 计时器（每秒更新一次已用时 + ETA）──
-                const exportStartTime = Date.now();
+                const exportStartTime = performance.now();
                 const fmtTime = (ms) => {
                     const s = Math.round(ms / 1000);
-                    const m = Math.floor(s / 60);
-                    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+                    return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
                 };
                 this._exportTimerInterval = setInterval(() => {
                     if (!this.isExporting) return;
-                    const elapsed = Date.now() - exportStartTime;
+                    const elapsed = performance.now() - exportStartTime;
                     document.getElementById('render-elapsed').textContent = fmtTime(elapsed);
-                    // ETA：基于当前进度推算剩余时间
-                    const fillEl = document.getElementById('export-fill');
-                    const pctStr = fillEl ? parseFloat(fillEl.style.width) : 0;
-                    const pct = isNaN(pctStr) ? 0 : pctStr;
+                    const pct = parseFloat(document.getElementById('export-fill').style.width) || 0;
                     if (pct > 0) {
-                        const totalEstMs = elapsed / (pct / 100);
-                        const remaining = Math.max(0, totalEstMs - elapsed);
-                        document.getElementById('render-eta').textContent = fmtTime(remaining);
+                        document.getElementById('render-eta').textContent = fmtTime(Math.max(0, elapsed / (pct / 100) - elapsed));
                     }
                 }, 1000);
 
-                // V108: 录制前序：清空 -> 等待 -> 启动 -> 等待
-                this.chart.clear();
-                await new Promise(r => setTimeout(r, 200)); // 确保清空生效
+                try {
+                    // ── Step 1: 渲染完整数据 → 读取 Y 轴范围 ──
+                    const fullOption = this._parseUserOption();
+                    fullOption.animation = false;
+                    this._applyOptionStyle(fullOption);
+                    this.chart.setOption(fullOption, { notMerge: true });
+                    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-                // 启动慢放 (带递归注入)
-                this.runCode(true, SLOW_FACTOR);
-
-                // 等待第一帧渲染完成 (非常重要，否则第一张是白的)
-                await new Promise(r => setTimeout(r, 100));
-
-                let frame = 0;
-                const timer = setInterval(() => {
-                    if (!this.isExporting) { clearInterval(timer); return; }
-                    frame++;
-
+                    const yAxisExtents = [];
                     try {
-                        const currentOpt = this.chart.getOption();
-                        const bg = currentOpt.backgroundColor && currentOpt.backgroundColor !== 'auto' ? currentOpt.backgroundColor : '#ffffff';
+                        const model = this.chart.getModel();
+                        for (let i = 0; ; i++) {
+                            const comp = model.getComponent('yAxis', i);
+                            if (!comp) break;
+                            yAxisExtents.push({
+                                min: comp.axis.scale.getExtent()[0],
+                                max: comp.axis.scale.getExtent()[1]
+                            });
+                        }
+                    } catch (e) { }
 
-                        // 4K 导出（与截图一致）
+                    // 同样读取 X 轴范围（数值轴时需要锁定）
+                    const xAxisExtents = [];
+                    try {
+                        const model = this.chart.getModel();
+                        for (let i = 0; ; i++) {
+                            const comp = model.getComponent('xAxis', i);
+                            if (!comp) break;
+                            if (comp.axis.type === 'value' || comp.axis.type === 'time') {
+                                xAxisExtents.push({
+                                    min: comp.axis.scale.getExtent()[0],
+                                    max: comp.axis.scale.getExtent()[1]
+                                });
+                            } else {
+                                xAxisExtents.push(null); // category axis, no need to lock
+                            }
+                        }
+                    } catch (e) { }
+
+                    // ── Step 2: 逐帧静态渲染（数据插值 + 固定坐标轴） ──
+                    for (let frame = 1; frame <= totalFrames; frame++) {
+                        if (!this.isExporting) break;
+
+                        const linearT = frame / totalFrames;
+                        const t = easeFn(linearT);
+
+                        const opt = this._parseUserOption();
+                        opt.animation = false;
+                        this._applyOptionStyle(opt);
+                        this._interpolateForExport(opt, t);
+
+                        // 锁定 Y 轴
+                        if (yAxisExtents.length && opt.yAxis) {
+                            const axes = Array.isArray(opt.yAxis) ? opt.yAxis : [opt.yAxis];
+                            axes.forEach((ax, i) => {
+                                if (yAxisExtents[i]) { ax.min = yAxisExtents[i].min; ax.max = yAxisExtents[i].max; }
+                            });
+                            opt.yAxis = axes;
+                        }
+                        // 锁定数值 X 轴
+                        if (xAxisExtents.length && opt.xAxis) {
+                            const axes = Array.isArray(opt.xAxis) ? opt.xAxis : [opt.xAxis];
+                            axes.forEach((ax, i) => {
+                                if (xAxisExtents[i]) { ax.min = xAxisExtents[i].min; ax.max = xAxisExtents[i].max; }
+                            });
+                            opt.xAxis = axes;
+                        }
+
+                        this.chart.setOption(opt, { notMerge: true });
+                        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+                        const bg = opt.backgroundColor || '#ffffff';
                         const dataUrl = this.chart.getDataURL({
-                            type: 'png', pixelRatio: 2, backgroundColor: bg, excludeComponents: ['toolbox']
+                            type: 'png', pixelRatio: 3, backgroundColor: bg, excludeComponents: ['toolbox']
                         });
-                        folder.file(`${fileName}_frame_${String(frame).padStart(4, '0')}.png`, dataUrl.split(',')[1], { base64: true });
+                        folder.file(
+                            `${fileName}_frame_${String(frame).padStart(4, '0')}.png`,
+                            dataUrl.split(',')[1], { base64: true }
+                        );
 
                         const pct = Math.round((frame / totalFrames) * 100);
                         document.getElementById('export-fill').style.width = pct + '%';
                         document.getElementById('render-info').innerText = `${frame}/${totalFrames}`;
                         document.getElementById('render-pct').innerText = pct + '%';
+                    }
+                } catch (e) {
+                    console.error('导出失败', e);
+                }
 
-                        if (frame >= totalFrames) {
-                            clearInterval(timer);
-                            clearInterval(this._exportTimerInterval);
-                            // 显示最终已用时
-                            const totalElapsed = Date.now() - exportStartTime;
-                            document.getElementById('render-elapsed').textContent = fmtTime(totalElapsed);
-                            document.getElementById('render-eta').textContent = '完成 ✅';
-                            this.runCode(true, 1);
-                            zip.generateAsync({ type: "blob" }).then(c => {
-                                saveAs(c, `${fileName}_${fps}fps.zip`);
-                                setTimeout(() => { document.getElementById('render-modal').style.display = 'none'; this.isExporting = false; }, 1000);
-                            });
-                        }
-                    } catch (e) { }
-                }, captureInterval);
+                clearInterval(this._exportTimerInterval);
+                const totalElapsed = performance.now() - exportStartTime;
+                document.getElementById('render-elapsed').textContent = fmtTime(totalElapsed);
+                document.getElementById('render-eta').textContent = this.isExporting ? '完成 ✅' : '已取消';
+                this.runCode(true, 1);
+
+                if (this.isExporting) {
+                    zip.generateAsync({ type: 'blob' }).then(blob => {
+                        saveAs(blob, `${fileName}_${fps}fps.zip`);
+                        setTimeout(() => {
+                            document.getElementById('render-modal').style.display = 'none';
+                            this.isExporting = false;
+                        }, 1000);
+                    });
+                } else {
+                    document.getElementById('render-modal').style.display = 'none';
+                    this.isExporting = false;
+                }
             },
 
             applyPreset() {

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECharts 极速表格中转器</title>
+    <title>矩形图片生成器</title>
     <meta name="description" content="使用 ECharts custom 系列渲染高品质数据表格，支持实时预览与高清导出">
 
     <!-- ECharts 5 -->
@@ -282,6 +282,295 @@
                 opacity: 1;
             }
         }
+
+        /* ── Image Color Picker ── */
+        .img-upload-area {
+            border: 1.5px dashed rgba(0, 122, 255, 0.3);
+            border-radius: 12px;
+            padding: 14px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: rgba(0, 122, 255, 0.03);
+            position: relative;
+        }
+
+        .img-upload-area:hover {
+            border-color: rgba(0, 122, 255, 0.6);
+            background: rgba(0, 122, 255, 0.06);
+        }
+
+        .img-upload-area input[type=file] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .color-swatches-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+
+        .color-swatch {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15), inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+            transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s;
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .color-swatch:hover {
+            transform: scale(1.18);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+            z-index: 2;
+        }
+
+        .color-swatch .swatch-edit-icon {
+            position: absolute;
+            bottom: -3px;
+            right: -3px;
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.15s;
+            pointer-events: none;
+        }
+
+        .color-swatch:hover .swatch-edit-icon {
+            opacity: 1;
+        }
+
+        #color-img-preview {
+            width: 100%;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 8px;
+            display: none;
+            margin-top: 8px;
+        }
+
+        .color-swatch-label {
+            font-size: 9px;
+            font-weight: 600;
+            text-align: center;
+            margin-top: 3px;
+            color: #86868b;
+            font-family: monospace;
+            letter-spacing: -0.02em;
+        }
+
+        /* ── Color Scheme Cards ── */
+        .scheme-card {
+            border: 1.5px solid rgba(0, 0, 0, 0.07);
+            border-radius: 12px;
+            padding: 10px 10px 8px;
+            margin-top: 8px;
+            background: rgba(0, 0, 0, 0.015);
+            transition: border-color 0.18s, box-shadow 0.18s;
+            cursor: pointer;
+        }
+
+        .scheme-card:hover {
+            border-color: rgba(0, 122, 255, 0.35);
+            box-shadow: 0 2px 12px rgba(0, 122, 255, 0.08);
+        }
+
+        .scheme-card.selected {
+            border-color: #007aff;
+            background: rgba(0, 122, 255, 0.04);
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+        }
+
+        .scheme-strip {
+            display: flex;
+            height: 18px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 6px 0 7px;
+        }
+
+        .scheme-strip span {
+            flex: 1;
+            display: block;
+        }
+
+        .scheme-apply-btn {
+            width: 100%;
+            padding: 5px 0;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            background: linear-gradient(to bottom, #0a84ff, #007aff);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .scheme-apply-btn:hover {
+            opacity: 0.85;
+        }
+
+        .scheme-apply-btn.outline {
+            background: transparent;
+            color: #007aff;
+            border: 1.5px solid rgba(0, 122, 255, 0.35);
+        }
+
+        .scheme-apply-btn.outline:hover {
+            background: rgba(0, 122, 255, 0.06);
+        }
+
+        /* ── Fine-tune panel after scheme selection ── */
+        .finetune-panel {
+            background: rgba(0, 122, 255, 0.04);
+            border: 1.5px solid rgba(0, 122, 255, 0.18);
+            border-radius: 12px;
+            padding: 10px 12px 12px;
+            margin-top: 10px;
+        }
+
+        .finetune-color-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .finetune-color-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1d1d1f;
+            min-width: 54px;
+            flex-shrink: 0;
+        }
+
+        .finetune-hex-badge {
+            font-size: 10px;
+            font-family: monospace;
+            color: #86868b;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 5px;
+            padding: 2px 6px;
+            min-width: 64px;
+            text-align: center;
+            letter-spacing: 0.03em;
+        }
+
+        /* ── History section ── */
+        .history-details summary {
+            font-size: 10px;
+            font-weight: 600;
+            color: #86868b;
+            cursor: pointer;
+            user-select: none;
+            padding: 6px 2px;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .history-details summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .history-details summary::before {
+            content: '▶';
+            font-size: 8px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+
+        .history-details[open] summary::before {
+            transform: rotate(90deg);
+        }
+
+        .history-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 6px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.015);
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .history-row:hover {
+            background: rgba(0, 122, 255, 0.06);
+        }
+
+        .history-row-strip {
+            display: flex;
+            gap: 2px;
+            flex: 1;
+        }
+
+        .history-row-strip span {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            display: block;
+            flex-shrink: 0;
+        }
+
+        .history-row-name {
+            font-size: 9px;
+            color: #86868b;
+            font-weight: 600;
+            max-width: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* ── Drag-to-swap in fine-tune ── */
+        .ft-drag-handle {
+            cursor: grab;
+            font-size: 12px;
+            color: #c7c7cc;
+            padding: 2px;
+            flex-shrink: 0;
+            user-select: none;
+            transition: color 0.15s;
+        }
+
+        .ft-drag-handle:hover {
+            color: #007aff;
+            cursor: grab;
+        }
+
+        .finetune-color-row[draggable="true"] {
+            cursor: default;
+            transition: background 0.15s, outline 0.15s;
+        }
+
+        .finetune-color-row.drag-over {
+            background: rgba(0, 122, 255, 0.07);
+            border-radius: 8px;
+            outline: 1.5px dashed rgba(0, 122, 255, 0.4);
+        }
+
+        .finetune-color-row.dragging {
+            opacity: 0.4;
+        }
     </style>
 </head>
 
@@ -295,7 +584,7 @@
         <div class="flex-shrink-0 px-5 pt-5 pb-4 border-b border-apple-border bg-white/90 fade-up">
             <div class="flex items-center justify-between mb-1">
                 <h1 class="text-xl font-bold tracking-tight">
-                    极速表格 <span class="text-apple-blue">中转器</span>
+                    矩形图片 <span class="text-apple-blue">生成器</span>
                 </h1>
                 <span
                     class="text-[10px] font-semibold text-apple-tertiary bg-black/[0.04] px-2.5 py-1 rounded-full tracking-wide">V1.0</span>
@@ -313,13 +602,13 @@
                 <textarea id="data-input" rows="8" spellcheck="false"
                     class="w-full rounded-lg border border-black/10 bg-black/[0.02] p-3 text-[13px] font-mono leading-relaxed resize-none
                            focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue transition-all"
-                    placeholder="粘贴 CSV/TSV/空格分隔数据，例如：&#10;姓名,年龄,城市,得分&#10;张三,28,北京,95&#10;李四,32,上海,88&#10;王五,25,广州,92">姓名,年龄,城市,得分
-张三,28,北京,95
-李四,32,上海,88
-王五,25,广州,92
-赵六,36,深圳,78
-孙七,29,杭州,91
-周八,41,成都,85</textarea>
+                    placeholder="粘贴 CSV/TSV/空格分隔数据，例如：&#10;姓名|年龄|城市|得分&#10;张三|28|北京|95&#10;李四|32|上海|88&#10;王五|25|广州|92">姓名|年龄|城市|得分
+张三|28|北京|95
+李四|32|上海|88
+王五|25|广州|92
+赵六|36|深圳|78
+孙七|29|杭州|91
+周八|41|成都|85</textarea>
                 <div class="flex gap-2 mt-2">
                     <button onclick="App.render(true)"
                         class="btn-spring flex-1 bg-gradient-to-b from-[#0a84ff] to-apple-blue text-white text-[13px] font-semibold py-2.5 rounded-full shadow-md shadow-apple-blue/20">
@@ -382,11 +671,7 @@
                 style="animation-delay:0.15s">
                 <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider mb-3">样式配置</h2>
 
-                <!-- Primary Color -->
-                <div class="flex items-center justify-between mb-4">
-                    <label class="text-[13px] font-medium">主色调</label>
-                    <input type="color" id="cfg-color" value="#007AFF" onchange="App.render(false)">
-                </div>
+
 
                 <!-- Font Family (searchable, like table.html) -->
                 <div class="mb-4" style="position:relative; z-index:50;">
@@ -419,17 +704,7 @@
                     </div>
                 </div>
 
-                <!-- Column Width Ratio -->
-                <div class="mb-4">
-                    <div class="flex justify-between items-center mb-1.5">
-                        <label class="text-[12px] font-medium text-apple-secondary">列宽比例</label>
-                        <span id="cfg-colwidth-val"
-                            class="text-[11px] font-semibold text-apple-blue tabular-nums">1.0</span>
-                    </div>
-                    <input type="range" id="cfg-colwidth" min="0.5" max="2.0" step="0.1" value="1.0"
-                        oninput="document.getElementById('cfg-colwidth-val').textContent=this.value; App.render(false)"
-                        class="w-full">
-                </div>
+
 
                 <!-- Row Height -->
                 <div class="mb-4">
@@ -451,7 +726,7 @@
                             class="text-[11px] font-semibold text-apple-blue tabular-nums">16</span>
                     </div>
                     <input type="range" id="cfg-hfontsize" min="10" max="30" step="1" value="16"
-                        oninput="document.getElementById('cfg-hfontsize-val').textContent=this.value; App.render(false)"
+                        oninput="document.getElementById('cfg-hfontsize-val').textContent=this.value; App.render(true)"
                         class="w-full">
                 </div>
 
@@ -463,9 +738,190 @@
                             class="text-[11px] font-semibold text-apple-blue tabular-nums">14</span>
                     </div>
                     <input type="range" id="cfg-bfontsize" min="10" max="26" step="1" value="14"
-                        oninput="document.getElementById('cfg-bfontsize-val').textContent=this.value; App.render(false)"
+                        oninput="document.getElementById('cfg-bfontsize-val').textContent=this.value; App.render(true)"
                         class="w-full">
                 </div>
+            </section>
+
+
+            <!-- ── 🎨 颜色配置 (整合区块) ── -->
+            <section class="bg-white rounded-xl border border-apple-border shadow-xs p-4 fade-up"
+                style="animation-delay:0.17s">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider">🎨 颜色配置</h2>
+                    <span id="color-extract-status" class="text-[10px] text-apple-tertiary min-h-[14px]"></span>
+                </div>
+
+                <!-- 主色调 + 背景颜色 并排 -->
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div
+                        class="flex flex-col items-center gap-1 p-2 rounded-xl bg-black/[0.02] border border-black/[0.04]">
+                        <span class="text-[10px] text-apple-secondary font-medium">表头主色</span>
+                        <input type="color" id="cfg-color" value="#007AFF" onchange="App.render(false)">
+                    </div>
+                    <div class="flex flex-col items-center gap-1 p-2 rounded-xl bg-black/[0.02] border border-black/[0.04]"
+                        id="bg-color-row">
+                        <span class="text-[10px] text-apple-secondary font-medium">背景颜色</span>
+                        <div class="flex items-center gap-1.5">
+                            <input type="color" id="cfg-bg-color" value="#FFFFFF" onchange="App.render(false)"
+                                title="点击修改背景颜色">
+                            <button onclick="document.getElementById('cfg-bg-color').value='#FFFFFF'; App.render(false)"
+                                class="text-[9px] px-1.5 py-0.5 rounded bg-black/[0.04] hover:bg-black/[0.08] text-apple-tertiary">重置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 透明背景 toggle -->
+                <div class="flex items-center justify-between mb-3 px-1">
+                    <label class="text-[13px] font-medium">透明背景</label>
+                    <label class="ios-toggle">
+                        <input type="checkbox" id="cfg-transparent" onchange="App.onTransparentChange()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <!-- 分割线 -->
+                <div style="height:1px; background:rgba(0,0,0,0.06); margin:8px 0 12px;"></div>
+
+                <!-- Upload area -->
+                <div class="img-upload-area" id="img-upload-area" title="点击或拖拽上传图片">
+                    <input type="file" accept="image/*" id="color-img-input">
+                    <div id="img-upload-hint">
+                        <div style="font-size:20px; margin-bottom:3px;">🖼️</div>
+                        <div class="text-[12px] font-medium text-apple-blue">上传图片提取配色</div>
+                        <div class="text-[10px] text-apple-tertiary mt-1">点击或拖拽图片 — 自动应用到图表</div>
+                    </div>
+                    <img id="color-img-preview" alt="预览">
+                </div>
+
+                <!-- Color swatches & scheme selection -->
+                <div id="color-swatches-wrap" style="display:none; margin-top:10px;">
+
+                    <!-- 重提取按鈕 -->
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-[11px] font-medium text-apple-secondary">配色方案选择</span>
+                        <button onclick="App.reExtractColors()"
+                            class="btn-spring text-[10px] px-2 py-0.5 rounded bg-black/[0.04] hover:bg-black/[0.08] text-apple-secondary">🔄
+                            重提取</button>
+                    </div>
+
+                    <!-- 原始提取方案 1 -->
+                    <div class="scheme-card" id="raw-scheme-card">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <span style="font-size:10px;font-weight:600;color:#1d1d1f;">📊 原始方案一</span>
+                            <span style="font-size:9px;color:#86868b;">饱和色为主</span>
+                        </div>
+                        <div class="scheme-strip" id="raw-scheme-strip"></div>
+                        <div style="font-size:9px;color:#86868b;margin-bottom:6px;" id="raw-scheme-roles"></div>
+                        <button class="scheme-apply-btn outline" onclick="App.applyScheme('raw')">✔ 使用此方案</button>
+                    </div>
+
+                    <!-- 原始提取方案 2 -->
+                    <div class="scheme-card" id="raw-scheme-card2" style="margin-top:8px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <span style="font-size:10px;font-weight:600;color:#1d1d1f;">📊 原始方案二</span>
+                            <span style="font-size:9px;color:#86868b;">亮色为主</span>
+                        </div>
+                        <div class="scheme-strip" id="raw-scheme-strip2"></div>
+                        <div style="font-size:9px;color:#86868b;margin-bottom:6px;" id="raw-scheme-roles2"></div>
+                        <button class="scheme-apply-btn outline" onclick="App.applyScheme('raw2')">✔ 使用此方案</button>
+                    </div>
+
+                    <!-- AI 推荐配色方案 (3套微调) -->
+                    <div style="margin-top:12px;">
+                        <div style="display:flex;align-items:center;gap:5px;margin-bottom:4px;">
+                            <span style="font-size:10px;font-weight:600;color:#1d1d1f;">🤖 DeepSeek 微调方案</span>
+                            <span id="ai-scheme-badge" style="font-size:9px;color:#86868b;"></span>
+                        </div>
+                        <div id="ai-schemes-loading"
+                            style="display:none;padding:14px;text-align:center;font-size:11px;color:#86868b;">
+                            <div style="margin-bottom:4px;">&#x1F504; AI 正在生成微调方案…</div>
+                        </div>
+                        <div id="ai-schemes-list"></div>
+                    </div>
+
+                    <!-- 隐藏的拾色器 -->
+                    <input type="color" id="swatch-color-picker"
+                        style="position:absolute;opacity:0;pointer-events:none;width:0;height:0;">
+
+                    <!-- 已应用配色角色表 -->
+                    <div id="color-map-result"
+                        style="display:none;margin-top:10px;padding:10px;background:rgba(0,0,0,0.03);border-radius:10px;border:1px solid rgba(0,0,0,0.06);">
+                    </div>
+
+                    <!-- ── 选方案后微调面板 ── -->
+                    <div id="scheme-finetune-panel" class="finetune-panel" style="display:none;">
+                        <div style="font-size:10px;font-weight:700;color:#007aff;margin-bottom:2px;">🎨 已选方案 · 微调颜色
+                        </div>
+                        <div style="font-size:9px;color:#86868b;margin-bottom:8px;">拖动 ⋮ 可互换颜色位置 · 修改后实时更新</div>
+
+                        <!-- 表头背景 -->
+                        <div class="finetune-color-row" data-ft-key="ft-header-color" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">表头背景</span>
+                            <input type="color" id="ft-header-color" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-header-hex">#000000</span>
+                        </div>
+                        <!-- 表头文字 -->
+                        <div class="finetune-color-row" data-ft-key="ft-header-text" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">表头文字</span>
+                            <input type="color" id="ft-header-text" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-header-text-hex">#ffffff</span>
+                        </div>
+                        <!-- 内容文字 -->
+                        <div class="finetune-color-row" data-ft-key="ft-body-text" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">内容文字</span>
+                            <input type="color" id="ft-body-text" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-body-text-hex">#1d1d1f</span>
+                        </div>
+                        <!-- 奇数行底: 颜色可选 + 透明度混合 -->
+                        <div class="finetune-color-row" data-ft-key="ft-odd-row" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">奇数行底</span>
+                            <input type="color" id="ft-odd-row" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-odd-row-hex">#e8eaf6</span>
+                        </div>
+                        <!-- 奇数行底透明度 -->
+                        <div style="display:flex;align-items:center;gap:8px;padding:0 4px 4px 28px;">
+                            <span style="font-size:9px;color:#86868b;min-width:28px;">透明度</span>
+                            <input type="range" id="ft-odd-opacity" min="0" max="90" value="60"
+                                oninput="App._onFinetuneChange()" style="flex:1;">
+                            <span id="ft-odd-opacity-val"
+                                style="font-size:10px;font-weight:600;color:#007aff;min-width:28px;text-align:right;">60%</span>
+                        </div>
+                        <!-- 边框颜色 -->
+                        <div class="finetune-color-row" data-ft-key="ft-border" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">边框颜色</span>
+                            <input type="color" id="ft-border" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-border-hex">#e5e5ea</span>
+                        </div>
+                        <!-- 画布背景 -->
+                        <div class="finetune-color-row" data-ft-key="ft-bg-color" draggable="true">
+                            <span class="ft-drag-handle" title="拖拽互换颜色">⋮</span>
+                            <span class="finetune-color-label">画布背景</span>
+                            <input type="color" id="ft-bg-color" oninput="App._onFinetuneChange()"
+                                style="width:28px;height:28px;border-radius:6px;cursor:pointer;border:none;padding:0;box-shadow:0 0 0 2px rgba(0,0,0,0.08);flex-shrink:0;">
+                            <span class="finetune-hex-badge" id="ft-bg-hex">#ffffff</span>
+                        </div>
+                    </div>
+
+                    <!-- ── 历史配色方案（可折叠）── -->
+                    <details id="color-history-details" class="history-details" style="margin-top:10px;display:none;">
+                        <summary>🕘 历史配色方案 <span id="history-count" style="margin-left:2px;"></span></summary>
+                        <div id="color-history-list" style="margin-top:4px;"></div>
+                    </details>
+                </div>
+
+                <!-- Canvas (hidden, for processing) -->
+                <canvas id="color-extract-canvas" style="display:none;"></canvas>
             </section>
 
             <!-- ── Background & Export ── -->
@@ -473,28 +929,48 @@
                 style="animation-delay:0.2s">
                 <h2 class="text-[11px] font-semibold text-apple-tertiary uppercase tracking-wider mb-3">背景与导出</h2>
 
-                <!-- Background Toggle -->
-                <div class="flex items-center justify-between mb-4">
-                    <label class="text-[13px] font-medium">透明背景</label>
-                    <label class="ios-toggle">
-                        <input type="checkbox" id="cfg-transparent" onchange="App.render(false)">
-                        <span class="slider"></span>
-                    </label>
+                <!-- Hidden margin inputs (always 0 via auto-fit) -->
+                <input type="range" id="cfg-mt" value="0" style="display:none;">
+                <input type="range" id="cfg-mb" value="0" style="display:none;">
+                <input type="range" id="cfg-ml" value="0" style="display:none;">
+                <input type="range" id="cfg-mr" value="0" style="display:none;">
+
+                <!-- Border Radius -->
+                <div class="mb-4 mt-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="text-[12px] font-medium text-apple-secondary">表格圆角</span>
+                        <span id="cfg-radius-val" class="text-[10px] text-apple-blue font-mono">8</span>
+                    </div>
+                    <input type="range" id="cfg-radius" min="0" max="60" step="2" value="8"
+                        oninput="document.getElementById('cfg-radius-val').textContent=this.value; App.render(false)"
+                        class="w-full">
                 </div>
 
-                <!-- Canvas Size -->
-                <div class="mb-4">
-                    <label class="text-[12px] font-medium text-apple-secondary mb-1.5 block">画布尺寸</label>
-                    <select id="cfg-canvas" onchange="App.applyCanvasSize()"
-                        class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
-                        style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
-                        <option value="auto" selected>🖼️ 自动适配数据</option>
-                        <option value="1080,1890">📱 8:14 竖屏</option>
-                        <option value="1080,1920">🎵 9:16 竖屏</option>
-                        <option value="1920,1080">📺 16:9 横屏</option>
-                        <option value="1080,1080">⬜ 1:1 正方形</option>
-                        <option value="800,600">🖥️ 4:3 经典</option>
-                    </select>
+                <!-- ── JS 代码注入区 ── -->
+                <div class="mb-4 mt-2">
+                    <div class="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+                        <label class="text-[12px] font-medium text-apple-secondary">JS 高级定制 (option)</label>
+                        <div class="flex gap-2 flex-wrap">
+                            <button onclick="App.showGeneratedCode()"
+                                class="btn-spring px-2 py-1 bg-purple-50 text-purple-600 rounded text-[10px] font-semibold hover:bg-purple-100">👁
+                                显示代码</button>
+                            <button onclick="App.runCode(false)"
+                                class="btn-spring px-2 py-1 bg-apple-blue/10 text-apple-blue rounded text-[10px] font-semibold hover:bg-apple-blue/20">▶
+                                运行</button>
+                            <button onclick="App.copyCode()"
+                                class="btn-spring px-2 py-1 bg-black/[0.04] text-apple-text rounded text-[10px] hover:bg-black/[0.08]">📋
+                                复制</button>
+                            <button onclick="App.resetCode()"
+                                class="btn-spring px-2 py-1 bg-red-50 text-red-500 rounded text-[10px] hover:bg-red-100">↺
+                                重置</button>
+                        </div>
+                    </div>
+                    <textarea id="code-area" spellcheck="false"
+                        class="w-full h-32 px-3 py-2 rounded-lg border border-black/10 bg-[#1e1e1e] text-[#d4d4d4] text-[11px] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-apple-blue/30 focus:border-apple-blue transition-all resize-y"
+                        placeholder="// 在此可用 JS 修改 option
+// 例如: option.backgroundColor = '#000';
+// 修改生效后点击运行。"></textarea>
+                    <p id="code-status" class="text-[10px] mt-1 min-h-[14px] text-apple-tertiary"></p>
                 </div>
 
                 <!-- Export Quality -->
@@ -503,8 +979,8 @@
                     <select id="cfg-quality"
                         class="w-full px-3 py-2 rounded-lg border border-black/10 bg-white text-[13px] cursor-pointer focus:outline-none focus:ring-2 focus:ring-apple-blue/20 transition-all appearance-none"
                         style="background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5L5 6.5L8 3.5' stroke='%23aeaeb2' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;">
-                        <option value="2">4K 高清</option>
-                        <option value="8">8K 超清</option>
+                        <option value="4">4K 高清 (4倍)</option>
+                        <option value="8">8K 超清 (8倍)</option>
                     </select>
                 </div>
 
@@ -597,6 +1073,18 @@
                 // Auto-test API on load
                 this.testApi();
 
+                // Init image color picker
+                this.initColorPicker();
+
+                // Restore JS Code from LocalStorage 
+                if (typeof localStorage !== 'undefined') {
+                    const savedCode = localStorage.getItem('echarts_studio_table_code');
+                    if (savedCode) {
+                        const codeEl = document.getElementById('code-area');
+                        if (codeEl) codeEl.value = savedCode;
+                    }
+                }
+
                 // Init font panel (searchable dropdown like table.html)
                 this.initFontPanel();
 
@@ -627,6 +1115,33 @@
 
                 const splitLine = (line) => {
                     if (delimiter instanceof RegExp) return line.split(delimiter).map(s => s.trim());
+                    if (delimiter === ',') {
+                        const result = [];
+                        let current = '';
+                        let inQuotes = false;
+                        for (let i = 0; i < line.length; i++) {
+                            const char = line[i];
+                            if (char === '"' && line[i + 1] === '"') {
+                                current += '"';
+                                i++; // skip escaped quote
+                            } else if (char === '"') {
+                                inQuotes = !inQuotes;
+                            } else if (char === ',' && !inQuotes) {
+                                result.push(current.trim());
+                                current = '';
+                            } else {
+                                current += char;
+                            }
+                        }
+                        result.push(current.trim());
+                        // Remove outer quotes if they exist exactly once around the value
+                        return result.map(s => {
+                            if (s.startsWith('"') && s.endsWith('"') && s.length >= 2) {
+                                return s.slice(1, -1).trim();
+                            }
+                            return s;
+                        });
+                    }
                     return line.split(delimiter).map(s => s.trim());
                 };
 
@@ -833,21 +1348,27 @@
                 statusEl.style.color = '#86868b';
 
                 // Pre-processing
+                // 移除仅作为视觉干扰的无意义逗号 (保留千分位数字如 1,000)
+                rawText = rawText.replace(/([^\d]),([^\d])/g, '$1 $2');
                 rawText = rawText.replace(/\n\s*\n/g, '\n').trim();
 
-                const systemPrompt = `你现在是【精密金融数据转换器】。你的唯一任务是将乱序的保险利益演示表文本转换为结构化 JSON。
+                const systemPrompt = `你现在是【精密金融数据转换器】。你的任务是将乱序文本数据转换为结构化的 JSON，内部逻辑必须使用竖线（|）作为分隔标准。
 
 核心规则（优先级最高）：
-1. **严禁拆分逗号**：数字中的逗号（如 500,000）必须作为数值的一部分完整保留，绝对禁止将其视为列分隔符。
-2. **死守 5 列结构**：输出的每一行必须严格对应【保单年度、累计缴费、提取金额、累计提取、账户余额】。
-3. **字符串返回**：为了绝对保留千分位逗号，请将所有数值以“字符串”形式返回（例如 "1,000,000" 而不是 1000000）。
-4. **空值补齐**：如果某列数据缺失，必须使用 "-" 占位，确保 DATA 数组中每一行都有且只有 5 个元素。
-5. **任务流程**：识别‘保单年度’作为行起始锚点，整理后续 4 个对应的财务要素。
+1. **强制内部逻辑**：在返回 JSON 之前，请先在内部将数据逻辑整理为以 竖线（|） 分隔的格式。在最终生成的 DATA 数组中，确保 500,000 这样的数字被视为一个整体字符串。
+2. **严禁使用逗号作为列分隔符。**
+3. **数值保护**：所有的千分位逗号必须保留在数字字符串内部（例如 "1,000,000"），不得拆分。
+4. **结构对齐**：每一行数据必须严格包含相应的列数，由 | 逻辑划分。
+5. **空值补齐**：如果某列数据缺失，必须使用 "-" 占位。
+6. **自动识别表头**：请根据文本内容自动推断出表头的数组结构，不要写死 5 列，以实际行数据为准。
 
-返回格式要求（纯 JSON）：
+返回格式要求必须是一段纯 JSON，不要带 markdown 代码块标记，不要包含其他说明语句：
 {
-  "labels": { "sideTitle": "保单年度", "subTitles": ["累计缴费", "提取金额", "累计提取", "账户余额"] },
-  "data": [ ["1", "500,000", "-", "-", "0"], ["2", "1,000,000", "-", "-", "65,340"] ]
+  "headers": ["保单年度", "累计缴费", "提取金额", "累计提取", "账户余额"],
+  "data": [
+    ["1", "500,000", "-", "-", "0"],
+    ["2", "1,000,000", "-", "-", "65,340"]
+  ]
 }`;
 
                 try {
@@ -875,31 +1396,35 @@
                     let rawContent = (responseData.choices?.[0]?.message?.content || '').trim();
                     if (!rawContent) { statusEl.textContent = '❌ AI 未返回内容'; statusEl.style.color = '#ff3b30'; return; }
 
+                    let jsonContent = rawContent;
+                    if (jsonContent.startsWith('```')) {
+                        const lines = jsonContent.split('\n');
+                        if (lines.length >= 2) {
+                            if (lines[0].startsWith('```')) lines.shift();
+                            if (lines[lines.length - 1].startsWith('```')) lines.pop();
+                            jsonContent = lines.join('\n').trim();
+                        }
+                    }
+
                     // Robust JSON extraction
-                    const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+                    const jsonMatch = jsonContent.match(/\{[\s\S]*\}/);
                     if (!jsonMatch) throw new Error('无法提取 JSON 结构');
                     const parsed = JSON.parse(jsonMatch[0]);
 
-                    if (!parsed.labels || !parsed.data) throw new Error('JSON 字段缺失');
+                    if (!parsed.headers || !parsed.data) throw new Error('JSON 字段缺失(headers 或 data)');
 
-                    const headers = [parsed.labels.sideTitle, ...parsed.labels.subTitles];
+                    const colsCount = parsed.headers.length;
                     const rows = parsed.data.map(row => {
-                        // Strict padding to 5 columns
                         const r = [...row];
-                        while (r.length < 5) r.push('-');
-                        return r.slice(0, 5);
+                        while (r.length < colsCount) r.push('-');
+                        return r.slice(0, colsCount);
                     });
 
-                    // Build CSV output with protective quotes for commas
-                    const escape = val => {
-                        let s = String(val);
-                        if (/[,\n"]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-                        return s;
-                    };
-                    const csvLines = [headers.map(escape).join(',')];
-                    rows.forEach(row => csvLines.push(row.map(escape).join(',')));
+                    // 使用 "|" 作为分隔符强制写入输入框
+                    const outputLines = [parsed.headers.join('|')];
+                    rows.forEach(row => outputLines.push(row.join('|')));
 
-                    document.getElementById('data-input').value = csvLines.join('\n');
+                    document.getElementById('data-input').value = outputLines.join('\n');
 
                     // Immediate Update
                     this.render(true);
@@ -931,14 +1456,27 @@
             getConfig() {
                 return {
                     primaryColor: document.getElementById('cfg-color').value,
+                    bgColor: (document.getElementById('cfg-bg-color')?.value) || '#FFFFFF',
                     fontFamily: this.fontFamily || 'sans-serif',
                     fontScale: this.fontScale || 1.0,
-                    colWidthRatio: parseFloat(document.getElementById('cfg-colwidth').value),
                     rowHeight: parseInt(document.getElementById('cfg-rowheight').value),
                     headerFontSize: parseInt(document.getElementById('cfg-hfontsize').value),
                     bodyFontSize: parseInt(document.getElementById('cfg-bfontsize').value),
                     transparent: document.getElementById('cfg-transparent').checked,
+                    marginTop: parseInt(document.getElementById('cfg-mt').value) || 0,
+                    marginBottom: parseInt(document.getElementById('cfg-mb').value) || 0,
+                    marginLeft: parseInt(document.getElementById('cfg-ml').value) || 0,
+                    marginRight: parseInt(document.getElementById('cfg-mr').value) || 0,
+                    borderRadius: parseInt(document.getElementById('cfg-radius')?.value || '8') || 0,
                 };
+            },
+
+            // Called when any margin slider changes
+            onMarginChange() {
+                const raw = document.getElementById('data-input').value;
+                const data = this.parseInputData(raw);
+                if (data) this.autoFitToData(data);
+                this.render(false);
             },
 
             // ──────────────────────────────────────────────────
@@ -956,10 +1494,21 @@
 
                 const ROW_H = config.rowHeight;
                 const TABLE_H = TOTAL_ROWS * ROW_H;
-                const COL_W = Math.floor((this.state.width * 0.88) / COLS) * config.colWidthRatio;
-                const TABLE_W = COL_W * COLS;
-                const OFFSET_X = (this.state.width - TABLE_W) / 2;
-                const OFFSET_Y = Math.max(60, (this.state.height - TABLE_H) / 2 - 40);
+                const canvasW = this.state.width;
+                const canvasH = this.state.height;
+
+                // Left margin is ALWAYS 0 — table always starts at the left edge of canvas
+                // Table width fills the full canvas width (left/right margin sliders do not affect horizontal layout)
+                const availableW = Math.max(COLS * 20, canvasW);
+
+                const COL_W = availableW / COLS;
+                const TABLE_W = availableW;
+
+                // OFFSET_X is always 0: table is always anchored to the left canvas edge
+                const OFFSET_X = 0;
+
+                // Position Y based on Top Margin only
+                const OFFSET_Y = config.marginTop;
 
                 // Lighter/darker from primary for alternating rows
                 const hexToRgb = (hex) => {
@@ -969,12 +1518,16 @@
                     return [r, g, b];
                 };
                 const [pr, pg, pb] = hexToRgb(config.primaryColor);
-                const headerBg = config.primaryColor;
-                const headerTextColor = '#FFFFFF';
-                const rowEvenBg = '#FFFFFF';
-                const rowOddBg = `rgba(${pr}, ${pg}, ${pb}, 0.04)`;
-                const borderColor = `rgba(${pr}, ${pg}, ${pb}, 0.12)`;
-                const cellTextColor = '#1d1d1f';
+
+                // palette controls row colors, but cfg-color ALWAYS controls the header
+                // (so changing the primary color picker always takes effect)
+                const palette = this._appliedPalette || null;
+                const headerBg = config.primaryColor;  // always from cfg-color
+                const headerTextColor = palette ? palette.textContrast : '#FFFFFF';
+                const rowEvenBg = config.transparent ? 'transparent' : config.bgColor;
+                const rowOddBg = palette ? `rgba(${hexToRgb(palette.sidebar).join(',')}, 0.06)` : `rgba(${pr}, ${pg}, ${pb}, 0.04)`;
+                const borderColor = palette ? `rgba(${hexToRgb(palette.highlight).join(',')}, 0.18)` : `rgba(${pr}, ${pg}, ${pb}, 0.12)`;
+                const cellTextColor = palette ? palette.textMain : '#1d1d1f';
 
                 // Build flat data: [rowIndex, colIndex, cellValue, isHeader]
                 const seriesData = [];
@@ -1012,19 +1565,24 @@
                     const children = [];
 
                     // ① Cell background rect (skip in textOnly mode)
+                    const R = config.borderRadius || 0;
                     if (renderMode !== 'textOnly') {
+                        // Determine corner radii for this cell
+                        let cellShape = { x, y, width: COL_W, height: ROW_H };
+                        if (R > 0) {
+                            if (isHeader && colIdx === 0) cellShape.r = [R, 0, 0, 0];
+                            else if (isHeader && colIdx === COLS - 1) cellShape.r = [0, R, 0, 0];
+                            else if (!isHeader && rowIdx === ROWS && colIdx === 0) cellShape.r = [0, 0, 0, R];
+                            else if (!isHeader && rowIdx === ROWS && colIdx === COLS - 1) cellShape.r = [0, 0, R, 0];
+                        }
                         children.push({
                             type: 'rect',
-                            shape: { x: x, y: y, width: COL_W, height: ROW_H },
+                            shape: cellShape,
                             style: {
                                 fill: bgColor,
                                 stroke: borderColor,
                                 lineWidth: 0.5,
                             },
-                            ...(isHeader && colIdx === 0 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [8, 0, 0, 0] } } : {}),
-                            ...(isHeader && colIdx === COLS - 1 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 8, 0, 0] } } : {}),
-                            ...(!isHeader && rowIdx === ROWS && colIdx === 0 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 0, 0, 8] } } : {}),
-                            ...(!isHeader && rowIdx === ROWS && colIdx === COLS - 1 ? { shape: { x, y, width: COL_W, height: ROW_H, r: [0, 0, 8, 0] } } : {}),
                         });
                     }
 
@@ -1055,8 +1613,8 @@
                 // Background logic per render mode
                 let optBg;
                 if (renderMode === 'textOnly') optBg = 'transparent';
-                else if (renderMode === 'bgOnly') optBg = config.transparent ? 'transparent' : '#FFFFFF';
-                else optBg = config.transparent ? 'transparent' : '#FFFFFF';
+                else if (renderMode === 'bgOnly') optBg = config.transparent ? 'transparent' : config.bgColor;
+                else optBg = config.transparent ? 'transparent' : config.bgColor;
 
                 const option = {
                     backgroundColor: optBg,
@@ -1077,9 +1635,38 @@
                         coordinateSystem: 'cartesian2d',
                         z: 10,
                     }],
-                    // Title removed per user request
                     title: { show: false },
                 };
+
+                // ★ Inject user JS logic if any directly onto option
+                const codeEl = document.getElementById('code-area');
+                if (codeEl && codeEl.value && codeEl.value.trim()) {
+                    try {
+                        const code = codeEl.value;
+                        // Use a wrapper that supports BOTH:
+                        //   a) mutation: option.xxx = yyy  (mutates the passed object)
+                        //   b) reassignment: option = {new obj}  (return value captured)
+                        const func = new Function('option', `
+                            "use strict";
+                            ${code}
+                            return option;
+                        `);
+                        const returned = func(option);
+                        // If the code returned a new non-null object (e.g. option = {...}), merge it in
+                        if (returned !== undefined && returned !== null && typeof returned === 'object' && returned !== option) {
+                            Object.assign(option, returned);
+                        }
+                        const statusEl = document.getElementById('code-status');
+                        if (statusEl) { statusEl.textContent = '✅ JS 运行成功'; statusEl.style.color = '#34c759'; setTimeout(() => { if (statusEl.textContent.includes('运行成功')) statusEl.textContent = ''; }, 1500); }
+                    } catch (e) {
+                        const statusEl = document.getElementById('code-status');
+                        if (statusEl) {
+                            statusEl.textContent = '⚠️ 运行失败: ' + (e && e.message ? e.message : String(e));
+                            statusEl.style.color = '#ff3b30';
+                        }
+                        console.error('JS Injection Error', e);
+                    }
+                }
 
                 return option;
             },
@@ -1102,26 +1689,921 @@
                     statusEl.style.color = '#34c759';
                 }
 
-                // Auto-fit canvas if 'auto' is selected
-                const canvasMode = document.getElementById('cfg-canvas').value;
-                if (canvasMode === 'auto') this.autoFitToData(data);
+                // Always auto-fit canvas
+                this.autoFitToData(data);
 
                 const config = this.getConfig();
                 const option = this.buildTableOption(data, config);
 
                 if (!option) return;
 
-                // Update chart container background
+                // Update chart container background and border-radius
                 const container = document.getElementById('chart-container');
-                container.style.background = config.transparent ? 'repeating-conic-gradient(#e0e0e0 0% 25%, #fff 0% 50%) 0 0/20px 20px' : '#FFFFFF';
+                const radius = config.borderRadius || 0;
+                container.style.background = config.transparent ? 'repeating-conic-gradient(#e0e0e0 0% 25%, #fff 0% 50%) 0 0/20px 20px' : config.bgColor;
+                container.style.borderRadius = radius + 'px';
+                container.style.overflow = radius > 0 ? 'hidden' : '';
 
                 if (isFullReset) this.chart.clear();
                 this.chart.setOption(option, { notMerge: isFullReset });
             },
 
             // ──────────────────────────────────────────────────
+            //  TRANSPARENT BACKGROUND TOGGLE HANDLER
+            // ──────────────────────────────────────────────────
+            onTransparentChange() {
+                const isTransparent = document.getElementById('cfg-transparent').checked;
+                const bgColorRow = document.getElementById('bg-color-row');
+                if (bgColorRow) bgColorRow.style.opacity = isTransparent ? '0.4' : '1';
+                this.render(false);
+            },
+
+            // ──────────────────────────────────────────────────
+            //  JS CODE EXTENSIONS
+            // ──────────────────────────────────────────────────
+            runCode(isFullReset = false) {
+                const code = document.getElementById('code-area').value;
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem('echarts_studio_table_code', code);
+                }
+                this.render(isFullReset);
+            },
+
+            // 显示当前图表生成的 option 代码（序列化为可读 JS）
+            showGeneratedCode() {
+                const raw = document.getElementById('data-input').value;
+                const data = this.parseInputData(raw);
+                if (!data) {
+                    const st = document.getElementById('code-status');
+                    if (st) { st.textContent = '⚠️ 暂无数据，请先渲染表格'; st.style.color = '#ff9500'; }
+                    return;
+                }
+                const config = this.getConfig();
+                // Build option WITHOUT the JS injection from code-area (to show the base option)
+                const oldCodeAreaVal = document.getElementById('code-area').value;
+                document.getElementById('code-area').value = '';
+                const option = this.buildTableOption(data, config, 'normal');
+                document.getElementById('code-area').value = oldCodeAreaVal;
+
+                if (!option) return;
+
+                // Serialize: renderItem function is not serializable; replace with placeholder comment
+                const optCopy = Object.assign({}, option);
+                if (optCopy.series) {
+                    optCopy.series = optCopy.series.map(s => {
+                        const sc = Object.assign({}, s);
+                        if (typeof sc.renderItem === 'function') sc.renderItem = '/* renderItem function — generated by App */';
+                        return sc;
+                    });
+                }
+
+                // Pretty-print
+                let jsonStr;
+                try {
+                    jsonStr = JSON.stringify(optCopy, (k, v) => {
+                        if (typeof v === 'string' && v.startsWith('/*')) return v;
+                        return v;
+                    }, 2);
+                    // Fix quoted placeholder
+                    jsonStr = jsonStr.replace(/"(\/\* renderItem function[^"]*)"/g, '$1');
+                } catch (e) {
+                    jsonStr = String(option);
+                }
+
+                const code = `// 当前图表 option（由极速中转器生成）\n// 注意: renderItem 为函数，无法完整序列化\noption = ${jsonStr};`;
+                document.getElementById('code-area').value = code;
+
+                const st = document.getElementById('code-status');
+                if (st) { st.textContent = '✅ 已显示当前图表 option 代码'; st.style.color = '#34c759'; }
+                setTimeout(() => { if (st && st.textContent.includes('已显示')) st.textContent = ''; }, 2500);
+            },
+
+            copyCode() {
+                const code = document.getElementById('code-area').value;
+                if (!code) {
+                    const st = document.getElementById('code-status');
+                    if (st) { st.textContent = '没有代码可复制'; st.style.color = '#ff9500'; }
+                    return;
+                }
+                navigator.clipboard.writeText(code).then(() => {
+                    const st = document.getElementById('code-status');
+                    if (st) { st.textContent = '代码已复制到剪贴板！'; st.style.color = '#34c759'; }
+                    setTimeout(() => { if (st && st.textContent.includes('已复制')) st.textContent = ''; }, 2000);
+                }).catch(err => {
+                    const st = document.getElementById('code-status');
+                    if (st) { st.textContent = '复制失败: ' + err; st.style.color = '#ff3b30'; }
+                });
+            },
+            resetCode() {
+                document.getElementById('code-area').value = '';
+                if (typeof localStorage !== 'undefined') localStorage.removeItem('echarts_studio_table_code');
+                const st = document.getElementById('code-status');
+                if (st) { st.textContent = ''; }
+                this.render(false);
+            },
+
+            // ──────────────────────────────────────────────────
             //  CLEAR DATA
             // ──────────────────────────────────────────────────
+            // ──────────────────────────────────────────────────
+            //  IMAGE COLOR EXTRACTION
+            // ──────────────────────────────────────────────────
+            _extractedColors: [],  // holds current 6 hex strings
+            _currentSwatchIndex: -1,
+            _colorImgEl: null,
+
+            initColorPicker() {
+                const input = document.getElementById('color-img-input');
+                const uploadArea = document.getElementById('img-upload-area');
+
+                if (input) {
+                    input.addEventListener('change', (e) => {
+                        const file = e.target.files && e.target.files[0];
+                        if (file) this._loadImageFile(file);
+                    });
+                }
+
+                // Drag-and-drop
+                if (uploadArea) {
+                    uploadArea.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        uploadArea.style.borderColor = 'rgba(0,122,255,0.8)';
+                        uploadArea.style.background = 'rgba(0,122,255,0.09)';
+                    });
+                    uploadArea.addEventListener('dragleave', () => {
+                        uploadArea.style.borderColor = '';
+                        uploadArea.style.background = '';
+                    });
+                    uploadArea.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        uploadArea.style.borderColor = '';
+                        uploadArea.style.background = '';
+                        const file = e.dataTransfer.files && e.dataTransfer.files[0];
+                        if (file && file.type.startsWith('image/')) this._loadImageFile(file);
+                    });
+                }
+
+                // Swatch color picker
+                const picker = document.getElementById('swatch-color-picker');
+                if (picker) {
+                    picker.addEventListener('input', (e) => {
+                        if (this._currentSwatchIndex < 0) return;
+                        const newColor = e.target.value;
+                        this._extractedColors[this._currentSwatchIndex] = newColor;
+                        this._renderSwatches();
+                    });
+                }
+
+                // ── Drag-to-swap in fine-tune panel ──
+                // Delegated to the panel container so it works even when panel is re-shown
+                const ftPanel = document.getElementById('scheme-finetune-panel');
+                if (ftPanel) {
+                    let dragSrcKey = null;
+
+                    ftPanel.addEventListener('dragstart', (e) => {
+                        const row = e.target.closest('[data-ft-key]');
+                        if (!row) { e.preventDefault(); return; }
+                        dragSrcKey = row.dataset.ftKey;
+                        row.classList.add('dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', dragSrcKey);
+                    });
+
+                    ftPanel.addEventListener('dragend', (e) => {
+                        ftPanel.querySelectorAll('.finetune-color-row').forEach(r => {
+                            r.classList.remove('dragging', 'drag-over');
+                        });
+                        dragSrcKey = null;
+                    });
+
+                    ftPanel.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        const row = e.target.closest('[data-ft-key]');
+                        ftPanel.querySelectorAll('.finetune-color-row').forEach(r => r.classList.remove('drag-over'));
+                        if (row && row.dataset.ftKey !== dragSrcKey) row.classList.add('drag-over');
+                        e.dataTransfer.dropEffect = 'move';
+                    });
+
+                    ftPanel.addEventListener('dragleave', (e) => {
+                        const row = e.target.closest('[data-ft-key]');
+                        if (row) row.classList.remove('drag-over');
+                    });
+
+                    ftPanel.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        const dstRow = e.target.closest('[data-ft-key]');
+                        if (!dstRow || !dragSrcKey || dstRow.dataset.ftKey === dragSrcKey) return;
+                        const dstKey = dstRow.dataset.ftKey;
+                        // Swap color picker values
+                        const srcInp = document.getElementById(dragSrcKey);
+                        const dstInp = document.getElementById(dstKey);
+                        if (srcInp && dstInp) {
+                            const tmp = srcInp.value;
+                            srcInp.value = dstInp.value;
+                            dstInp.value = tmp;
+                            // Trigger update
+                            this._onFinetuneChange();
+                        }
+                        ftPanel.querySelectorAll('.finetune-color-row').forEach(r => r.classList.remove('drag-over', 'dragging'));
+                        dragSrcKey = null;
+                    });
+                }
+            },
+
+            _loadImageFile(file) {
+                const reader = new FileReader();
+                const statusEl = document.getElementById('color-extract-status');
+                if (statusEl) { statusEl.textContent = '读取中...'; statusEl.style.color = '#86868b'; }
+
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this._colorImgEl = img;
+                        // Show preview
+                        const preview = document.getElementById('color-img-preview');
+                        const hint = document.getElementById('img-upload-hint');
+                        if (preview) { preview.src = ev.target.result; preview.style.display = 'block'; }
+                        if (hint) hint.style.display = 'none';
+                        // Extract
+                        this._doExtract(img);
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            },
+
+            reExtractColors() {
+                if (this._colorImgEl) this._doExtract(this._colorImgEl);
+            },
+
+            _doExtract(img) {
+                const statusEl = document.getElementById('color-extract-status');
+                try {
+                    const canvas = document.getElementById('color-extract-canvas');
+                    const MAX = 120; // sample at most 120×120
+                    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+                    const w = Math.max(1, Math.round(img.width * scale));
+                    const h = Math.max(1, Math.round(img.height * scale));
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const data = ctx.getImageData(0, 0, w, h).data;
+
+                    // Quantize each pixel to a 6-bit bucket (4 bits per channel for R,G,B)
+                    const buckets = {};
+                    for (let i = 0; i < data.length; i += 4) {
+                        const a = data[i + 3];
+                        if (a < 128) continue; // skip transparent
+                        const r = data[i] & 0xF0;
+                        const g = data[i + 1] & 0xF0;
+                        const b = data[i + 2] & 0xF0;
+                        const key = (r << 16) | (g << 8) | b;
+                        buckets[key] = (buckets[key] || 0) + 1;
+                    }
+
+                    // Sort by frequency, pick diverse top candidates
+                    const sorted = Object.entries(buckets)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([key]) => {
+                            const k = parseInt(key);
+                            const r = (k >> 16) & 0xFF;
+                            const g = (k >> 8) & 0xFF;
+                            const b = k & 0xFF;
+                            return { r, g, b };
+                        });
+
+                    // Greedy diversity selection: pick colors that are "far" from already selected
+                    const selected = [];
+                    const colorDist = (a, b) => {
+                        const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+                        return Math.sqrt(dr * dr + dg * dg + db * db);
+                    };
+                    for (const c of sorted) {
+                        if (selected.length >= 6) break;
+                        const minDist = selected.reduce((min, s) => Math.min(min, colorDist(c, s)), Infinity);
+                        if (selected.length === 0 || minDist > 40) selected.push(c);
+                    }
+                    // If we got fewer than 6, fill with variants
+                    while (selected.length < 6) {
+                        const base = selected[0] || { r: 100, g: 100, b: 200 };
+                        const idx = selected.length;
+                        selected.push({
+                            r: Math.min(255, base.r + idx * 25),
+                            g: Math.min(255, base.g + idx * 15),
+                            b: Math.min(255, base.b + idx * 10)
+                        });
+                    }
+
+                    // Preserve previous colors before overwriting
+                    if (this._extractedColors && this._extractedColors.length > 0) {
+                        this._prevExtractedColors = [...this._extractedColors];
+                    }
+
+                    this._extractedColors = selected.map(c => {
+                        return '#' + [c.r, c.g, c.b].map(v => v.toString(16).padStart(2, '0')).join('');
+                    });
+
+                    // Show raw scheme cards immediately
+                    document.getElementById('color-swatches-wrap').style.display = 'block';
+                    this._rawScheme = this._computeRawScheme(this._extractedColors);
+                    this._rawScheme2 = this._computeRawScheme2(this._extractedColors);
+                    this._showRawScheme(this._rawScheme, 'raw-scheme-strip', 'raw-scheme-roles');
+                    this._showRawScheme(this._rawScheme2, 'raw-scheme-strip2', 'raw-scheme-roles2');
+                    this._aiRefinedSchemes = null;
+
+                    if (statusEl) { statusEl.textContent = '✅ 已提取，AI 优化中…'; statusEl.style.color = '#86868b'; }
+                    // Trigger AI in background
+                    this._aiRefineColors();
+                } catch (e) {
+                    if (statusEl) { statusEl.textContent = '❌ 提取失败: ' + (e.message || e); statusEl.style.color = '#ff3b30'; }
+                    console.error('Color extract error', e);
+                }
+            },
+
+            // ── Build raw scheme from extracted colors (luminance/saturation heuristic) ──
+            // version 1: richest saturated color as header
+            _computeRawScheme(colors) {
+                const hexToHsl = (hex) => {
+                    const r = parseInt(hex.slice(1, 3), 16) / 255;
+                    const g = parseInt(hex.slice(3, 5), 16) / 255;
+                    const b = parseInt(hex.slice(5, 7), 16) / 255;
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const lum = (max + min) / 2;
+                    const sat = max === min ? 0 : (max - min) / (lum < 0.5 ? max + min : 2 - max - min);
+                    let hue = 0;
+                    if (max !== min) {
+                        const d = max - min;
+                        if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+                        else if (max === g) hue = ((b - r) / d + 2) / 6;
+                        else hue = ((r - g) / d + 4) / 6;
+                    }
+                    return { hex, hue, sat, lum };
+                };
+                const lightTint = (hex, factor) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return '#' + [r, g, b].map(v => Math.round(v + (255 - v) * factor).toString(16).padStart(2, '0')).join('');
+                };
+                const analyzed = colors.map(hexToHsl);
+                const bySat = [...analyzed].sort((a, b) => b.sat - a.sat);
+                const byLum = [...analyzed].sort((a, b) => a.lum - b.lum);
+
+                const headerCandidate = bySat[0];
+                const header_bg = headerCandidate.hex;
+                const header_text = headerCandidate.lum < 0.55 ? '#ffffff' : '#1a1a2e';
+                const darkCandidates = byLum.filter(c => c.lum < 0.45);
+                const body_text = darkCandidates.length > 0 ? darkCandidates[0].hex : '#1d1d1f';
+                const lightestExtracted = byLum[byLum.length - 1];
+                const canvas_bg = lightestExtracted.lum >= 0.80 ? lightestExtracted.hex : lightTint(header_bg, 0.88);
+                const odd_row_bg = lightTint(header_bg, 0.92);
+                const border = lightTint(header_bg, 0.80);
+
+                return { name: '原始方案一', header_bg, header_text, body_text, odd_row_bg, border, canvas_bg };
+            },
+
+            // version 2: second-rich saturation as header, brighter canvas_bg tint
+            _computeRawScheme2(colors) {
+                const hexToHsl = (hex) => {
+                    const r = parseInt(hex.slice(1, 3), 16) / 255;
+                    const g = parseInt(hex.slice(3, 5), 16) / 255;
+                    const b = parseInt(hex.slice(5, 7), 16) / 255;
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const lum = (max + min) / 2;
+                    const sat = max === min ? 0 : (max - min) / (lum < 0.5 ? max + min : 2 - max - min);
+                    return { hex, lum, sat };
+                };
+                const lightTint = (hex, factor) => {
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return '#' + [r, g, b].map(v => Math.round(v + (255 - v) * factor).toString(16).padStart(2, '0')).join('');
+                };
+                const analyzed = colors.map(hexToHsl);
+                const bySat = [...analyzed].sort((a, b) => b.sat - a.sat);
+                const byLum = [...analyzed].sort((a, b) => a.lum - b.lum);
+
+                // Use 2nd most saturated as header (if available), else the 1st
+                const headerCandidate = bySat[1] && bySat[1].sat > 0.15 ? bySat[1] : bySat[0];
+                const header_bg = headerCandidate.hex;
+                const header_text = headerCandidate.lum < 0.55 ? '#ffffff' : '#1a1a2e';
+                const darkCandidates = byLum.filter(c => c.lum < 0.45);
+                const body_text = darkCandidates.length > 0 ? darkCandidates[0].hex : '#1d1d1f';
+                // Use lightest for canvas_bg, but lighten more (target 0.93)
+                const lightestExtracted = byLum[byLum.length - 1];
+                const canvas_bg = lightestExtracted.lum >= 0.87 ? lightestExtracted.hex : lightTint(header_bg, 0.93);
+                const odd_row_bg = lightTint(header_bg, 0.94);
+                const border = lightTint(header_bg, 0.85);
+
+                return { name: '原始方案二', header_bg, header_text, body_text, odd_row_bg, border, canvas_bg };
+            },
+
+            // ── Render raw scheme card ──
+            _showRawScheme(scheme, stripId, rolesId) {
+                stripId = stripId || 'raw-scheme-strip';
+                rolesId = rolesId || 'raw-scheme-roles';
+                const strip = document.getElementById(stripId);
+                const roles = document.getElementById(rolesId);
+                if (!strip) return;
+                const keys = ['header_bg', 'canvas_bg', 'odd_row_bg', 'border', 'body_text', 'header_text'];
+                strip.innerHTML = keys.map(k => `<span style="background:${scheme[k]}" title="${k}"></span>`).join('');
+                if (roles) roles.textContent = `表头: ${scheme.header_bg.toUpperCase()}  背景: ${scheme.canvas_bg.toUpperCase()}  文字: ${scheme.body_text.toUpperCase()}`;
+            },
+
+            // ── Render a scheme card in the AI list ──
+            _renderSchemeCard(scheme, idx) {
+                const card = document.createElement('div');
+                card.className = 'scheme-card';
+                card.dataset.schemeIdx = idx;
+
+                const keys = ['header_bg', 'canvas_bg', 'odd_row_bg', 'border', 'body_text', 'header_text'];
+                const stripHtml = keys.map(k => `<span style="background:${scheme[k]}" title="${k}"></span>`).join('');
+
+                const labels = [
+                    ['表头背景', scheme.header_bg],
+                    ['内容文字', scheme.body_text],
+                    ['画布背景', scheme.canvas_bg],
+                ].map(([l, c]) => `<span style="margin-right:8px;"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c};margin-right:2px;vertical-align:middle;"></span>${l}: ${c.toUpperCase()}</span>`).join('');
+
+                card.innerHTML = `
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <span style="font-size:10px;font-weight:600;color:#1d1d1f;">${scheme.name || '方案 ' + (idx + 1)}</span>
+                        <span style="font-size:9px;color:#86868b;">AI 推荐</span>
+                    </div>
+                    <div class="scheme-strip">${stripHtml}</div>
+                    <div style="font-size:8.5px;color:#86868b;margin-bottom:6px;line-height:1.6;">${labels}</div>
+                    <button class="scheme-apply-btn" onclick="App.applyScheme(${idx})">✨ 使用此方案</button>`;
+
+                document.getElementById('ai-schemes-list').appendChild(card);
+            },
+
+            // ────────────────────────────────────────────────────
+            //  AI COLOR REFINEMENT — 3 schemes via DeepSeek
+            // ────────────────────────────────────────────────────
+            async _aiRefineColors() {
+                const statusEl = document.getElementById('color-extract-status');
+                const badge = document.getElementById('ai-scheme-badge');
+                const loading = document.getElementById('ai-schemes-loading');
+                const listEl = document.getElementById('ai-schemes-list');
+                const apiKey = (document.getElementById('ai-apikey')?.value || '').trim();
+                const colors = this._extractedColors;
+                if (!colors || colors.length === 0) return;
+
+                if (!apiKey) {
+                    if (badge) badge.textContent = '（需填写 API Key）';
+                    return;
+                }
+
+                if (loading) loading.style.display = 'block';
+                if (listEl) listEl.innerHTML = '';
+                if (badge) badge.textContent = '';
+
+                const systemPrompt = `你是专业的 UI 配色师。请基于给定的图片提取色，为数据表格生成 3 套微调配色方案。
+
+【重要】这 3 套方案必须以原始提取色为基础，只做轻微的色相/明度/饱和度微调，不能产生与原始色调差异过大的颜色。
+尤其：header_bg 和 canvas_bg 必须与对应原始色在色系上一致（RGB 各通道偏差不超过 40）。
+
+每套方案包含 6 个字段：
+- header_bg: 表头背景色（基于图片最饱和色微调，与 canvas_bg 色调明显不同，有质感）
+- header_text: 表头文字色（与 header_bg 形成高对比，通常白色 #ffffff 或深色）
+- body_text: 数据行文字色（深色，可读性强，通常 #1d1d1f 或深灰）
+- odd_row_bg: 奇数行底色（极淡，高亮度 lum>0.88，轻微与 canvas_bg 区分）
+- border: 单元格边框色（极淡细腻，lum>0.82）
+- canvas_bg: 画布背景色（基于图片最浅/最亮色微调，与 header_bg 色调有所区别）
+
+3 套方案名称分别为：微调方案一、微调方案二、微调方案三
+每套的微调方向：
+1. "微调方案一"：在原始色基础上整体略微提升饱和度，使表格更鲜明
+2. "微调方案二"：在原始色基础上略微降低饱和度/提升亮度，使表格更柔和清爽
+3. "微调方案三"：在原始色基础上微调色相（±10°以内），给出一个有细微差异的第三选择
+
+规则：
+- 所有颜色必须是 #rrggbb 格式（6位十六进制小写）
+- 必须符合 WCAG AA 对比度，body_text/header_text 要易读
+- odd_row_bg、border、canvas_bg 必须偏浅（lum > 0.82）
+- header_bg 与 canvas_bg 之间明度差 > 0.35，确保表头和背景区分明显
+
+只返回纯 JSON 数组，不含任何 markdown 或说明：
+[{"name":"微调方案一","header_bg":"#...","header_text":"#...","body_text":"#...","odd_row_bg":"#...","border":"#...","canvas_bg":"#..."},{"name":"微调方案二",...},{"name":"微调方案三",...}]`;
+
+                const userMsg = `图片提取的 6 个主色：${colors.join(', ')}\n原始方案中 header_bg=${this._rawScheme?.header_bg || colors[0]}，canvas_bg=${this._rawScheme?.canvas_bg || colors[colors.length - 1]}\n请在原始色基础上生成 3 套微调配色方案，保持色系一致，只做细微调整。`;
+
+                try {
+                    const res = await fetch('https://api.deepseek.com/chat/completions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [
+                                { role: 'system', content: systemPrompt },
+                                { role: 'user', content: userMsg }
+                            ],
+                            max_tokens: 600,
+                            temperature: 0.6
+                        })
+                    });
+
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+
+                    let raw = (data.choices?.[0]?.message?.content || '').trim();
+                    raw = raw.replace(/```[a-z]*\n?/gi, '').replace(/```/g, '').trim();
+                    const arrMatch = raw.match(/\[[\s\S]*\]/);
+                    if (!arrMatch) throw new Error('AI 未返回有效 JSON 数组');
+
+                    const schemes = JSON.parse(arrMatch[0]);
+                    const required = ['header_bg', 'header_text', 'body_text', 'odd_row_bg', 'border', 'canvas_bg'];
+                    const valid = schemes.filter(s => required.every(k => s[k] && /^#[0-9a-fA-F]{6}$/.test(s[k])));
+                    if (valid.length === 0) throw new Error('所有方案字段校验失败');
+
+                    this._aiRefinedSchemes = valid;
+                    if (loading) loading.style.display = 'none';
+                    if (badge) badge.textContent = `${valid.length} 套`;
+                    if (listEl) listEl.innerHTML = '';
+                    valid.forEach((s, i) => this._renderSchemeCard(s, i));
+                    if (statusEl) { statusEl.textContent = `✨ AI 推荐了 ${valid.length} 套方案`; statusEl.style.color = '#34c759'; }
+
+                } catch (e) {
+                    console.error('AI refine colors error:', e);
+                    if (loading) loading.style.display = 'none';
+                    if (badge) badge.textContent = '生成失败';
+                    if (listEl) listEl.innerHTML = `<div style="font-size:10px;color:#ff3b30;padding:8px;">⚠️ ${e.message || e}</div>`;
+                    if (statusEl) { statusEl.textContent = '⚠️ AI 优化失败，使用原始提取色'; statusEl.style.color = '#ff9500'; }
+                }
+            },
+
+
+            // Compute role map from extracted colors (same logic as applyExtractedColors)
+
+            _getColorRoleMap(colors) {
+                const analyze = (hex) => {
+                    const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255;
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const lum = (max + min) / 2;
+                    const sat = max === min ? 0 : (max - min) / (lum < 0.5 ? max + min : 2 - max - min);
+                    return { hex, lum, sat };
+                };
+                const analyzed = colors.map(analyze);
+                const byLum = [...analyzed].sort((a, b) => a.lum - b.lum);
+                const bySat = [...analyzed].sort((a, b) => b.sat - a.sat);
+                const bg = byLum[0].hex;
+                const textMain = byLum[1] ? byLum[1].hex : byLum[0].hex;
+                const textContrast = byLum[byLum.length - 1].hex;
+                const highlight = bySat[0].hex;
+                const sidebar = bySat[1] ? bySat[1].hex : bySat[0].hex;
+                const header = bySat[2] ? bySat[2].hex : sidebar;
+                const ROLE_NAMES = {
+                    [bg]: { label: '画布背景', icon: '🖼️', desc: '整体背景底色' },
+                    [textMain]: { label: '内容文字', icon: '🔤', desc: '数据行文字色' },
+                    [textContrast]: { label: '表头文字', icon: '📝', desc: '表头行文字色' },
+                    [highlight]: { label: '高亮/边框', icon: '✨', desc: '单元格边线色' },
+                    [sidebar]: { label: '奇数行底', icon: '📊', desc: '奇数行淡色底' },
+                    [header]: { label: '参考色', icon: '🎯', desc: '辅助参考色' },
+                };
+                // Handle duplicates: assign each analyzed item its role
+                return colors.map(hex => ROLE_NAMES[hex] || { label: '提取色', icon: '🎨', desc: hex.toUpperCase() });
+            },
+
+            _renderSwatches() {
+                const row = document.getElementById('color-swatches-row');
+                const labelsRow = document.getElementById('color-role-labels');
+                if (!row) return;
+
+                row.innerHTML = '';
+                if (labelsRow) labelsRow.innerHTML = '';
+
+                // Show previous palette if available
+                const prevRow = document.getElementById('color-prev-row');
+                const prevSection = document.getElementById('color-prev-section');
+                if (this._prevExtractedColors && this._prevExtractedColors.length > 0) {
+                    if (prevSection) prevSection.style.display = 'block';
+                    if (prevRow) {
+                        prevRow.innerHTML = '';
+                        this._prevExtractedColors.forEach((hex, i) => {
+                            const swatch = document.createElement('div');
+                            swatch.className = 'color-swatch';
+                            swatch.style.cssText = `background:${hex}; width:28px; height:28px; border-radius:6px; opacity:0.85; flex-shrink:0;`;
+                            swatch.title = hex + ' （点击替换当前第' + (i + 1) + '色）';
+                            swatch.addEventListener('click', () => {
+                                if (i < this._extractedColors.length) {
+                                    this._extractedColors[i] = hex;
+                                    this._renderSwatches();
+                                }
+                            });
+                            prevRow.appendChild(swatch);
+                        });
+                    }
+                } else {
+                    if (prevSection) prevSection.style.display = 'none';
+                }
+
+                // Compute role map for current extracted colors
+                const roleMap = this._getColorRoleMap(this._extractedColors);
+
+                // Render swatches with role labels
+                this._extractedColors.forEach((hex, i) => {
+                    const role = roleMap[i];
+
+                    // Swatch column wrapper
+                    const col = document.createElement('div');
+                    col.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:3px;';
+
+                    // Swatch circle
+                    const swatch = document.createElement('div');
+                    swatch.className = 'color-swatch';
+                    swatch.style.background = hex;
+                    swatch.title = `${role.icon} ${role.label}\n${hex.toUpperCase()} — ${role.desc}\n（点击微调颜色）`;
+                    swatch.innerHTML = '<span class="swatch-edit-icon">✏️</span>';
+                    swatch.addEventListener('click', () => {
+                        this._currentSwatchIndex = i;
+                        const picker = document.getElementById('swatch-color-picker');
+                        if (!picker) return;
+                        picker.value = hex;
+                        const rect = swatch.getBoundingClientRect();
+                        picker.style.position = 'fixed';
+                        picker.style.left = rect.left + 'px';
+                        picker.style.top = rect.bottom + 4 + 'px';
+                        picker.style.opacity = '0';
+                        picker.style.pointerEvents = 'auto';
+                        picker.click();
+                    });
+                    col.appendChild(swatch);
+
+                    // Role icon badge
+                    const iconEl = document.createElement('div');
+                    iconEl.style.cssText = 'font-size:10px; line-height:1;';
+                    iconEl.textContent = role.icon;
+                    col.appendChild(iconEl);
+
+                    // Role label
+                    const labelEl = document.createElement('div');
+                    labelEl.style.cssText = 'font-size:8.5px;font-weight:600;color:#1d1d1f;text-align:center;letter-spacing:-0.02em;line-height:1.2;max-width:36px;word-break:break-all;';
+                    labelEl.textContent = role.label;
+                    col.appendChild(labelEl);
+
+                    row.appendChild(col);
+                });
+
+                // Clear old hex labels row (now shown in swatches)
+                if (labelsRow) labelsRow.innerHTML = '';
+            },
+
+            // Intelligently map 6 colors by luminance + saturation to role names
+            _mapColorsToRoles(colors) {
+                const analyze = (hex) => {
+                    const r = parseInt(hex.slice(1, 3), 16) / 255;
+                    const g = parseInt(hex.slice(3, 5), 16) / 255;
+                    const b = parseInt(hex.slice(5, 7), 16) / 255;
+                    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                    const lum = (max + min) / 2;
+                    const sat = max === min ? 0 : (max - min) / (lum < 0.5 ? max + min : 2 - max - min);
+                    return { lum, sat };
+                };
+                return colors.map(c => analyze(c));
+            },
+
+            // ── Apply a color scheme ('raw', 'raw2', '__history__', or AI scheme index) ──
+            applyScheme(schemeKey) {
+                let scheme;
+                if (schemeKey === 'raw') {
+                    scheme = this._rawScheme;
+                } else if (schemeKey === 'raw2') {
+                    scheme = this._rawScheme2;
+                } else if (schemeKey === '__history__') {
+                    scheme = this._historyReapplyScheme;
+                    this._historyReapplyScheme = null;
+                } else {
+                    scheme = this._aiRefinedSchemes?.[parseInt(schemeKey)];
+                }
+                if (!scheme) {
+                    const st = document.getElementById('color-extract-status');
+                    if (st) { st.textContent = '⚠️ 方案不存在，请先提取颜色'; st.style.color = '#ff9500'; }
+                    return;
+                }
+
+                const { header_bg, header_text, body_text, odd_row_bg, border, canvas_bg } = scheme;
+
+                // Highlight the selected card
+                document.querySelectorAll('.scheme-card').forEach(c => c.classList.remove('selected'));
+                if (schemeKey === 'raw') {
+                    document.getElementById('raw-scheme-card')?.classList.add('selected');
+                } else {
+                    const cards = document.getElementById('ai-schemes-list')?.querySelectorAll('.scheme-card');
+                    if (cards?.[parseInt(schemeKey)]) cards[parseInt(schemeKey)].classList.add('selected');
+                }
+
+                // Apply to UI controls
+                const cfgColor = document.getElementById('cfg-color');
+                if (cfgColor) cfgColor.value = this._toHex6(header_bg);
+
+                const cfgBgColor = document.getElementById('cfg-bg-color');
+                if (cfgBgColor) cfgBgColor.value = this._toHex6(canvas_bg);
+
+                const cfgTransparent = document.getElementById('cfg-transparent');
+                if (cfgTransparent) cfgTransparent.checked = false;
+
+                // Store palette for buildTableOption
+                this._appliedPalette = {
+                    bg: canvas_bg,
+                    textMain: body_text,
+                    textContrast: header_text,
+                    highlight: border,
+                    sidebar: odd_row_bg,
+                    header: header_bg,
+                };
+
+                this.render(true);
+
+                const st = document.getElementById('color-extract-status');
+                if (st) {
+                    st.textContent = `✅ "${scheme.name || '方案'}" 已应用！`;
+                    st.style.color = '#34c759';
+                }
+
+                // Show role mapping table
+                const mapEl = document.getElementById('color-map-result');
+                if (mapEl) {
+                    const roles = [
+                        { role: '表头背景', color: header_bg, desc: '表头行背景色' },
+                        { role: '表头文字', color: header_text, desc: '表头行文字色' },
+                        { role: '内容文字', color: body_text, desc: '数据行文字色' },
+                        { role: '奇数行底', color: odd_row_bg, desc: '交替行淡色底' },
+                        { role: '边框颜色', color: border, desc: '单元格边线色' },
+                        { role: '画布背景', color: canvas_bg, desc: '整体画布背景' },
+                    ];
+                    mapEl.innerHTML = `<div style="font-size:10px;font-weight:600;color:#86868b;margin-bottom:6px;">已应用·配色角色映射</div>` +
+                        roles.map(item => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                            <div style="width:16px;height:16px;border-radius:4px;background:${item.color};border:1px solid rgba(0,0,0,0.1);flex-shrink:0;"></div>
+                            <span style="font-size:10px;font-weight:600;color:#1d1d1f;min-width:50px;">${item.role}</span>
+                            <span style="font-size:9px;color:#86868b;">${item.color.toUpperCase()} — ${item.desc}</span>
+                        </div>`).join('');
+                    mapEl.style.display = 'block';
+                }
+
+                // ── Show fine-tune panel (5 colors + odd-row opacity slider) ──
+                const ftPanel = document.getElementById('scheme-finetune-panel');
+                if (ftPanel) {
+                    const setFt = (id, hexId, val) => {
+                        const inp = document.getElementById(id);
+                        const lbl = document.getElementById(hexId);
+                        const v = this._toHex6(val || '#888888');
+                        if (inp) inp.value = v;
+                        if (lbl) lbl.textContent = v.toUpperCase();
+                    };
+                    setFt('ft-header-color', 'ft-header-hex', header_bg);
+                    setFt('ft-header-text', 'ft-header-text-hex', header_text);
+                    setFt('ft-body-text', 'ft-body-text-hex', body_text);
+                    setFt('ft-border', 'ft-border-hex', border);
+                    setFt('ft-bg-color', 'ft-bg-hex', canvas_bg);
+                    // Odd-row preview at default 60% opacity
+                    const opacitySlider = document.getElementById('ft-odd-opacity');
+                    const opacityVal = document.getElementById('ft-odd-opacity-val');
+                    const oddPreview = document.getElementById('ft-odd-preview');
+                    const oddHexEl = document.getElementById('ft-odd-row-hex');
+                    if (opacitySlider) opacitySlider.value = 60;
+                    if (opacityVal) opacityVal.textContent = '60%';
+                    const blended = this._blendHexAlpha(header_bg, canvas_bg, 0.60);
+                    if (oddPreview) oddPreview.style.background = blended;
+                    if (oddHexEl) oddHexEl.textContent = blended.toUpperCase();
+                    ftPanel.style.display = 'block';
+                }
+
+                // ── Record history ──
+                this._addToHistory(scheme);
+            },
+
+            // Fine-tune panel live update — odd-row uses opacity slider linked to header color
+            _onFinetuneChange() {
+                const get = (id, hexId) => {
+                    const inp = document.getElementById(id);
+                    const lbl = document.getElementById(hexId);
+                    const v = inp ? inp.value : null;
+                    if (lbl && v) lbl.textContent = v.toUpperCase();
+                    return v;
+                };
+                const hColor = get('ft-header-color', 'ft-header-hex');
+                const htColor = get('ft-header-text', 'ft-header-text-hex');
+                const btColor = get('ft-body-text', 'ft-body-text-hex');
+                const brdColor = get('ft-border', 'ft-border-hex');
+                const bgColor = get('ft-bg-color', 'ft-bg-hex');
+
+                // Odd-row: user picks color directly, opacity slider blends it with bg
+                const oddPicker = document.getElementById('ft-odd-row');
+                const opacitySlider = document.getElementById('ft-odd-opacity');
+                const opacityVal = document.getElementById('ft-odd-opacity-val');
+                const oddHexEl = document.getElementById('ft-odd-row-hex');
+                const oddBase = oddPicker ? oddPicker.value : (hColor || '#007aff');
+                const opacity = opacitySlider ? parseInt(opacitySlider.value) : 60;
+                if (opacityVal) opacityVal.textContent = opacity + '%';
+                const oddColor = this._blendHexAlpha(oddBase, bgColor || '#ffffff', opacity / 100);
+                if (oddHexEl) {
+                    oddPicker.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.08)';
+                    oddHexEl.textContent = oddColor.toUpperCase();
+                }
+
+                // Sync main pickers
+                const cfgColor = document.getElementById('cfg-color');
+                if (cfgColor && hColor) cfgColor.value = hColor;
+                const cfgBgColor = document.getElementById('cfg-bg-color');
+                if (cfgBgColor && bgColor) cfgBgColor.value = bgColor;
+
+                // Update full palette
+                if (this._appliedPalette) {
+                    if (hColor) this._appliedPalette.header = hColor;
+                    if (htColor) this._appliedPalette.textContrast = htColor;
+                    if (btColor) this._appliedPalette.textMain = btColor;
+                    if (oddColor) this._appliedPalette.sidebar = oddColor;
+                    if (brdColor) this._appliedPalette.highlight = brdColor;
+                    if (bgColor) this._appliedPalette.bg = bgColor;
+                }
+                this.render(false);
+            },
+
+            // Helper: blend hexFg on hexBg at alpha (0..1), return opaque hex result
+            _blendHexAlpha(hexFg, hexBg, alpha) {
+                hexFg = (hexFg || '#888888').replace('#', '');
+                hexBg = (hexBg || '#ffffff').replace('#', '');
+                const pr = parseInt(hexFg.slice(0, 2), 16) || 0;
+                const pg = parseInt(hexFg.slice(2, 4), 16) || 0;
+                const pb = parseInt(hexFg.slice(4, 6), 16) || 0;
+                const br = parseInt(hexBg.slice(0, 2), 16) || 255;
+                const bg2 = parseInt(hexBg.slice(2, 4), 16) || 255;
+                const bb = parseInt(hexBg.slice(4, 6), 16) || 255;
+                const nr = Math.round(pr * alpha + br * (1 - alpha));
+                const ng = Math.round(pg * alpha + bg2 * (1 - alpha));
+                const nb = Math.round(pb * alpha + bb * (1 - alpha));
+                return '#' + [nr, ng, nb].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+            },
+
+            // ── Color History ──
+            _colorHistory: [],
+
+            _addToHistory(scheme) {
+                // Avoid consecutive duplicates
+                const last = this._colorHistory[0];
+                if (last && last.header_bg === scheme.header_bg && last.canvas_bg === scheme.canvas_bg) return;
+                this._colorHistory.unshift({
+                    name: scheme.name || '方案',
+                    header_bg: scheme.header_bg,
+                    canvas_bg: scheme.canvas_bg,
+                    scheme: scheme
+                });
+                if (this._colorHistory.length > 10) this._colorHistory.pop();
+                this._renderHistory();
+            },
+
+            _renderHistory() {
+                const listEl = document.getElementById('color-history-list');
+                const details = document.getElementById('color-history-details');
+                const countEl = document.getElementById('history-count');
+                if (!listEl || !details) return;
+                if (this._colorHistory.length === 0) {
+                    details.style.display = 'none';
+                    return;
+                }
+                details.style.display = 'block';
+                if (countEl) countEl.textContent = `(${this._colorHistory.length})`;
+                listEl.innerHTML = '';
+                this._colorHistory.forEach((entry, i) => {
+                    const row = document.createElement('div');
+                    row.className = 'history-row';
+                    row.title = `重新应用: ${entry.name}`;
+                    const keys = ['header_bg', 'canvas_bg', 'odd_row_bg', 'border', 'body_text', 'header_text'];
+                    const stripHtml = keys.map(k => {
+                        const c = entry.scheme[k] || '#cccccc';
+                        return `<span style="background:${c}" title="${k}"></span>`;
+                    }).join('');
+                    row.innerHTML = `
+                        <div class="history-row-strip">${stripHtml}</div>
+                        <span class="history-row-name" title="${entry.name}">${entry.name}</span>
+                        <button onclick="App._reapplyHistory(${i})" style="font-size:9px;padding:2px 6px;border-radius:10px;background:rgba(0,122,255,0.1);color:#007aff;border:none;cursor:pointer;flex-shrink:0;">应用</button>
+                    `;
+                    listEl.appendChild(row);
+                });
+            },
+
+            _reapplyHistory(idx) {
+                const entry = this._colorHistory[idx];
+                if (!entry) return;
+                // Temporarily inject back so applyScheme can find it
+                this._historyReapplyScheme = entry.scheme;
+                this.applyScheme('__history__');
+            },
+
+            // backward-compat alias
+            applyExtractedColors() { this.applyScheme('raw'); },
+
+
+            _toHex6(hex) {
+                if (!hex || hex.length < 4) return '#000000';
+                if (hex.length === 4) {
+                    return '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+                }
+                return hex.substring(0, 7);
+            },
+
+
             clearData() {
                 document.getElementById('data-input').value = '';
                 document.getElementById('parse-status').textContent = '';
@@ -1147,15 +2629,19 @@
                 const fileName = document.getElementById('cfg-filename').value.trim() || 'ECharts_Table';
                 const pr = this.getPixelRatio();
                 const label = pr >= 8 ? '8K' : '4K';
-                const currentOpt = this.chart.getOption();
-                let bg = currentOpt.backgroundColor;
-                if (Array.isArray(bg)) bg = bg[0];
-                if (!bg || bg === 'transparent') bg = '#FFFFFF';
+                const config = this.getConfig();
+                const isTransparent = config.transparent;
+                const radius = (config.borderRadius || 0) * pr;
+
+                // For export: always render with canvas_bg (unless transparent toggled)
+                let bg = isTransparent ? 'transparent' : (config.bgColor || '#ffffff');
 
                 try {
                     const dataUrl = this.chart.getDataURL({ type: 'png', pixelRatio: pr, backgroundColor: bg });
-                    const blob = this.base64ToBlob(dataUrl.split(',')[1]);
-                    saveAs(blob, `${fileName}_${label}.png`);
+                    const suffix = isTransparent ? '_transparent_' : '_';
+                    this._clipRoundedCorner(dataUrl, radius, blob => {
+                        saveAs(blob, `${fileName}${suffix}${label}.png`);
+                    });
                 } catch (e) {
                     alert('导出失败: ' + (e.message || e));
                 }
@@ -1166,14 +2652,50 @@
                 const fileName = document.getElementById('cfg-filename').value.trim() || 'ECharts_Table';
                 const pr = this.getPixelRatio();
                 const label = pr >= 8 ? '8K' : '4K';
+                const config = this.getConfig();
+                const radius = (config.borderRadius || 0) * pr;
 
                 try {
                     const dataUrl = this.chart.getDataURL({ type: 'png', pixelRatio: pr, backgroundColor: 'transparent' });
-                    const blob = this.base64ToBlob(dataUrl.split(',')[1]);
-                    saveAs(blob, `${fileName}_transparent_${label}.png`);
+                    this._clipRoundedCorner(dataUrl, radius, blob => {
+                        saveAs(blob, `${fileName}_transparent_${label}.png`);
+                    });
                 } catch (e) {
                     alert('导出失败: ' + (e.message || e));
                 }
+            },
+
+            // Shared helper: clip a dataURL image to rounded corners, call back with Blob
+            _clipRoundedCorner(dataUrl, radius, onBlob) {
+                if (!radius || radius <= 0) {
+                    // No rounding — convert directly
+                    const b64 = dataUrl.split(',')[1];
+                    onBlob(this.base64ToBlob(b64));
+                    return;
+                }
+                const img = new Image();
+                img.onload = () => {
+                    const cvs = document.createElement('canvas');
+                    cvs.width = img.width;
+                    cvs.height = img.height;
+                    const ctx = cvs.getContext('2d');
+                    const r = Math.min(radius, img.width / 2, img.height / 2);
+                    ctx.beginPath();
+                    ctx.moveTo(r, 0);
+                    ctx.lineTo(img.width - r, 0);
+                    ctx.quadraticCurveTo(img.width, 0, img.width, r);
+                    ctx.lineTo(img.width, img.height - r);
+                    ctx.quadraticCurveTo(img.width, img.height, img.width - r, img.height);
+                    ctx.lineTo(r, img.height);
+                    ctx.quadraticCurveTo(0, img.height, 0, img.height - r);
+                    ctx.lineTo(0, r);
+                    ctx.quadraticCurveTo(0, 0, r, 0);
+                    ctx.closePath();
+                    ctx.clip();
+                    ctx.drawImage(img, 0, 0);
+                    cvs.toBlob(onBlob, 'image/png');
+                };
+                img.src = dataUrl;
             },
 
             // ──────────────────────────────────────────────────
@@ -1229,24 +2751,38 @@
                 const data = this.parseInputData(raw);
                 if (!data) { if (statusEl) statusEl.textContent = '⚠️ 无数据可导出'; return; }
                 const config = this.getConfig();
+                const radius = (config.borderRadius || 0) * pr;
 
                 btn.disabled = true; btn.textContent = '⏳ 导出中...';
                 if (statusEl) { statusEl.textContent = '正在渲染「仅背景」...'; statusEl.style.color = '#86868b'; }
 
                 try {
+                    // Helper: render offscreen + apply round corner clip → returns base64
+                    const renderAndClip = (renderMode, bgColor) =>
+                        this._renderOffscreen(data, config, renderMode, bgColor, pr).then(b64 =>
+                            new Promise(res => {
+                                const url = 'data:image/png;base64,' + b64;
+                                this._clipRoundedCorner(url, radius, blob => {
+                                    const reader = new FileReader();
+                                    reader.onload = () => res(reader.result.split(',')[1]);
+                                    reader.readAsDataURL(blob);
+                                });
+                            })
+                        );
+
                     // Step 1: background only
-                    const bgB64 = await this._renderOffscreen(data, config, 'bgOnly', '#FFFFFF', pr);
+                    const bgB64 = await renderAndClip('bgOnly', config.transparent ? 'transparent' : (config.bgColor || '#ffffff'));
                     if (statusEl) statusEl.textContent = '正在渲染「仅文字」...';
 
                     // Step 2: text only
-                    const txtB64 = await this._renderOffscreen(data, config, 'textOnly', 'transparent', pr);
+                    const txtB64 = await renderAndClip('textOnly', 'transparent');
                     if (statusEl) statusEl.textContent = '正在打包 ZIP...';
 
                     // Step 3: pack ZIP
                     const zip = new JSZip();
                     const folder = zip.folder(fileName);
-                    folder.file(`仅背景_${label}.png`, bgB64, { base64: true });
-                    folder.file(`仅文字_${label}.png`, txtB64, { base64: true });
+                    folder.file(`${fileName}_仅背景_${label}.png`, bgB64, { base64: true });
+                    folder.file(`${fileName}_仅文字_${label}.png`, txtB64, { base64: true });
                     const blob = await zip.generateAsync({ type: 'blob' });
                     saveAs(blob, `${fileName}_背景与文字_${label}.zip`);
 
@@ -1268,11 +2804,11 @@
                 const config = this.getConfig();
                 const ROW_H = config.rowHeight;
                 const TOTAL_ROWS = rows + 1;
-                // Calculate ideal width: ~180px per column, min 800
-                const idealW = Math.max(800, Math.min(2400, cols * 180));
-                // Calculate ideal height: table height + title space + padding
+                // idealW: canvas width = col count * base width (no horizontal margin offset since left is always 0)
+                const idealW = Math.max(200, cols * 180);
                 const tableH = TOTAL_ROWS * ROW_H;
-                const idealH = Math.max(600, Math.min(4000, tableH + 160));
+                // Canvas height = table rows + top/bottom margins
+                const idealH = tableH + config.marginTop + config.marginBottom;
 
                 if (this.state.width !== idealW || this.state.height !== idealH) {
                     this.state.width = idealW; this.state.height = idealH;
@@ -1287,16 +2823,7 @@
             //  CANVAS SIZE
             // ──────────────────────────────────────────────────
             applyCanvasSize() {
-                const val = document.getElementById('cfg-canvas').value;
-                if (val === 'auto') { this.render(true); return; }
-                const parts = val.split(',');
-                const w = parseInt(parts[0]); const h = parseInt(parts[1]);
-                if (!isNaN(w) && !isNaN(h)) { this.state.width = w; this.state.height = h; }
-                const dom = document.getElementById('chart-container');
-                dom.style.width = this.state.width + 'px';
-                dom.style.height = this.state.height + 'px';
-                if (this.chart) this.chart.resize({ width: this.state.width, height: this.state.height });
-                this.autoFit();
+                // Canvas size is always auto-fit. This function is kept for backward compat.
                 this.render(true);
             },
 
@@ -1366,6 +2893,12 @@
 
         window.onload = () => App.init();
     </script>
+
+    <!-- hidden backward-compat: cfg-canvas always 'auto' -->
+    <select id="cfg-canvas" style="display:none;">
+        <option value="auto" selected>auto</option>
+    </select>
+    <div id="custom-canvas-inputs" style="display:none;"></div>
 
 </body>
 
