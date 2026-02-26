@@ -5,10 +5,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>图片导出</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        // 拦截百度地图的弹窗报错
+        const nativeAlert = window.alert;
+        window.alert = function (msg) {
+            if (typeof msg === 'string' && (msg.indexOf('APP被您禁用') > -1 || msg.indexOf('百度地图') > -1 || msg.indexOf('Baidu Map') > -1 || msg.indexOf('APP Mcode码校验失败') > -1)) {
+                console.warn('已静默拦截百度地图 API 报错弹窗:', msg);
+                return;
+            }
+            nativeAlert(msg);
+        };
+
+        window.loadScript = function (src) {
+            return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) return resolve();
+                const script = document.createElement('script');
+                script.src = src;
+                script.defer = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        };
+
+        window.checkAndLoadDependencies = async function (code) {
+            const hasGL = code.includes('globe') || code.includes('bar3D') || code.includes('scatter3D') || code.includes('surface') || code.includes('gl');
+            const hasBMap = code.includes('bmap') || code.includes('BMap') || code.includes('百度地图');
+
+            if (hasBMap) {
+                await window.loadScript('https://api.map.baidu.com/api?v=3.0&ak=KOmVjPVUAey1G2E8zNhPiuQ6QiEmAwZu');
+                await window.loadScript('./libs/bmap.min.js');
+            }
+            if (hasGL) {
+                await window.loadScript('./libs/echarts-gl.min.js');
+            }
+        };
+    </script>
+    <script defer src="./libs/echarts.min.js"></script>
+    <script defer src="./libs/jszip.min.js"></script>
+    <script defer src="./libs/FileSaver.min.js"></script>
+    <script defer src="./libs/html2canvas.min.js"></script>
+    <script defer src="./libs/jquery.min.js"></script>
     <style>
         :root {
             --bg-color: #f5f5f7;
@@ -772,16 +809,21 @@
                 </div>
             </div>
 
-            <div class="sidebar-heading">导出</div>
+            <div class="sidebar-heading">导出设置</div>
             <div class="section">
-                <label>导出质量（截图与 ZIP 均按此质量）</label>
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <label style="margin:0;">透明背景</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="transparent-bg-toggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <label style="margin-top:8px;">导出质量（按此倍率输出高清图）</label>
                 <select id="export-quality-preset" class="input-select">
-                    <option value="2">4K</option>
-                    <option value="8">8K</option>
+                    <option value="2">4K 倍率</option>
+                    <option value="8">8K 极高倍率</option>
                 </select>
-                <button class="btn-sec" id="shot-btn" style="width:100%; margin-top:8px;">📸 截图</button>
-                <button class="btn-sec" id="export-bg-nobg-zip-btn" style="width:100%; margin-top:8px;">📦
-                    导出「仅背景」+「无背景」ZIP</button>
+                <button class="btn-main" id="shot-btn" style="width:100%; margin-top:12px;">📸 输出图片</button>
             </div>
 
             <div class="sidebar-heading">编辑与运行</div>
@@ -1312,129 +1354,40 @@
                     this.handleCanvasDoubleClick(params);
                 });
 
-                const defaultCode = `const CONFIG = {
-    colors: {
-        bg: '#F8F8F8',      // 背景色
-        sidebar: '#f9dd42', // 副色
-        header: '#0b32ed',  // 字2/主色
-        subHeader1: '#E0E0E0', 
-        subHeader2: '#D0D0D0', 
-        textMain: '#222427',   // 字1
-        textContrast: '#FFFFFF',
-        highlight: '#0b32ed',  // 字2/主色
-        line: '#EEEEEE'
-    },
-    labels: {
-        sideTitle: '年龄（男）',
-        mainTitle: '投入阶段',
-        subTitles: ['A账户', 'B账户']
-    },
-    widths: { col1: 0.25, col2: 0.35, col3: 0.40 }
-};
-
-const DATA = [
-    ['35岁', '70w', '70w/年'],
-    ['36岁', '-', '70w/年'],
-    ['总共', '70w', '140w']
-];
-
-// 文字缩放系数（由左侧滑块控制）
-const FONT_SCALE = window.__TABLE_FONT_SCALE || 1;
-// 字体家族，由侧栏选择（可为复合字体串）
-const FONT_FAMILY = window.__TABLE_FONT_FAMILY || 'sans-serif';
-// 无色块模式：仅保留文字与网格线（导出「无背景」时设置）
-const NO_COLOR_BLOCKS = window.__TABLE_NO_COLOR_BLOCKS || false;
-// 仅色块模式：只保留除网格线和文字以外的所有色块（导出「仅背景」时设置）
-const BACKGROUND_ONLY = window.__TABLE_BACKGROUND_ONLY || false;
-
-// 全屏填充：应用户要求，取消任何留白限制，表格始终铺满画布
-let _gridLeft = 0, _gridRight = 0, _gridTop = 0, _gridBottom = 0;
-
-// 渲染引擎
-option = {
-    backgroundColor: BACKGROUND_ONLY ? CONFIG.colors.bg : (NO_COLOR_BLOCKS ? 'transparent' : CONFIG.colors.bg),
-    grid: { top: _gridTop, left: _gridLeft, right: _gridRight, bottom: _gridBottom },
-    xAxis: { show: false, min: 0, max: 100 },
-    // yAxis 范围根据数据长度动态调整 (数据行数 + 2行表头)
-    yAxis: { show: false, min: 0, max: DATA.length + 2, inverse: true },
-    series: [{
-        type: 'custom',
-        renderItem: (params, api) => {
-            const group = { type: 'group', children: [] };
-            const rowHeight = api.size([0, 1])[1];
-            const width = params.coordSys.width;
-            const w1 = width * CONFIG.widths.col1, w2 = width * CONFIG.widths.col2, w3 = width * CONFIG.widths.col3;
-            const sideBlockHeight = rowHeight * 2;
-
-            // 智能字号适配算法 (V2)：
-            // 采用“非线性”增长而非“直接线性”增长，防止大画布下字体无限膨胀
-            const baseRow = 64;
-            // 1. 纵向：使用 0.65 次方，让增长曲线更平缓（大尺寸下表现更得体）
-            const vScale = Math.pow(rowHeight / baseRow, 0.65);
-            // 2. 横向：极小权重补偿，适配超宽比例
-            const hScale = Math.pow(width / 1000, 0.15);
-            // 3. 最终缩放系数 (加入 3.0 倍率软上限)
-            const scale = Math.min(3.0, vScale * hScale) * (FONT_SCALE || 1);
-            
-            const fw = window.__TABLE_FONT_WEIGHT || 'normal';
-            const fs = window.__TABLE_FONT_STYLE || 'normal';
-            // 针对原本应该是粗体的地方予以保留强化
-            const fwMid = (fw === 'normal' || fw === '400') ? 'bold' : fw;
-
-            // 基准字号
-            const BASE_FONT = {
-                sideTitle: 18,   // 左侧条
-                mainTitle: 26,   // 顶部标题
-                subTitle:  18,   // A/B 标题
-                cell:      16,   // 普通单元格
-                cellBold:  18    // 高亮单元格
-            };
-
-            const sideTitleFont = Math.round(BASE_FONT.sideTitle * scale);
-            const mainTitleFont = Math.round(BASE_FONT.mainTitle * scale);
-            const subTitleFont  = Math.round(BASE_FONT.subTitle  * scale);
-            const cellFont      = Math.round(BASE_FONT.cell      * scale);
-            const cellBoldFont  = Math.round(BASE_FONT.cellBold  * scale);
-
-            // 绘制表头 (仅在第一个数据项渲染时处理)
-            var headerFill = BACKGROUND_ONLY ? CONFIG.colors.sidebar : (NO_COLOR_BLOCKS ? 'transparent' : null);
-            var headerStroke = BACKGROUND_ONLY ? { stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { stroke: CONFIG.colors.line, lineWidth: 0.5 } : {});
-            if (params.dataIndex === 0) {
-                group.children.push(
-                    { type: 'rect', shape: { x: 0, y: 0, width: w1, height: sideBlockHeight }, style: Object.assign({ fill: headerFill || CONFIG.colors.sidebar }, headerStroke) },
-                    { type: 'rect', shape: { x: w1, y: 0, width: w2 + w3, height: rowHeight }, style: Object.assign({ fill: BACKGROUND_ONLY ? CONFIG.colors.header : (headerFill || CONFIG.colors.header) }, headerStroke) },
-                    { type: 'rect', shape: { x: w1, y: rowHeight, width: w2, height: rowHeight }, style: BACKGROUND_ONLY ? { fill: CONFIG.colors.subHeader1, stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { fill: 'transparent', stroke: CONFIG.colors.line, lineWidth: 0.5 } : { fill: CONFIG.colors.subHeader1, stroke: CONFIG.colors.bg }) },
-                    { type: 'rect', shape: { x: w1+w2, y: rowHeight, width: w3, height: rowHeight }, style: BACKGROUND_ONLY ? { fill: CONFIG.colors.subHeader2, stroke: 'transparent', lineWidth: 0 } : (NO_COLOR_BLOCKS ? { fill: 'transparent', stroke: CONFIG.colors.line, lineWidth: 0.5 } : { fill: CONFIG.colors.subHeader2, stroke: CONFIG.colors.bg }) }
-                );
-                if (!BACKGROUND_ONLY) {
-                    group.children.push(
-                        { type: 'text', style: { text: CONFIG.labels.sideTitle, x: w1/2, y: sideBlockHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fwMid + ' ' + sideTitleFont + 'px ' + FONT_FAMILY } },
-                        { type: 'text', style: { text: CONFIG.labels.mainTitle, x: w1 + (w2+w3)/2, y: rowHeight/2, fill: NO_COLOR_BLOCKS ? CONFIG.colors.textMain : CONFIG.colors.textContrast, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fw + ' ' + mainTitleFont + 'px ' + FONT_FAMILY } },
-                        { type: 'text', style: { text: CONFIG.labels.subTitles[0], x: w1 + w2/2, y: rowHeight*1.5, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fwMid + ' ' + subTitleFont + 'px ' + FONT_FAMILY } },
-                        { type: 'text', style: { text: CONFIG.labels.subTitles[1], x: w1 + w2 + w3/2, y: rowHeight*1.5, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fwMid + ' ' + subTitleFont + 'px ' + FONT_FAMILY } }
-                    );
-                }
-            }
-
-            // 绘制数据行
-            const row = DATA[params.dataIndex];
-            const yPos = (params.dataIndex + 2) * rowHeight;
-            var rowFill = BACKGROUND_ONLY ? (row[0] === '总共' ? 'rgba(0,0,0,0.02)' : 'transparent') : (NO_COLOR_BLOCKS ? 'transparent' : (row[0] === '总共' ? 'rgba(0,0,0,0.02)' : 'transparent'));
-            var rowStroke = BACKGROUND_ONLY ? { stroke: 'transparent', lineWidth: 0 } : { stroke: CONFIG.colors.line, lineWidth: 0.5 };
-            group.children.push(
-                { type: 'rect', shape: { x: 0, y: yPos, width: width, height: rowHeight }, style: Object.assign({ fill: rowFill }, rowStroke) }
-            );
-            if (!BACKGROUND_ONLY) {
-                group.children.push(
-                    { type: 'text', style: { text: row[0], x: w1/2, y: yPos + rowHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fw + ' ' + cellFont + 'px ' + FONT_FAMILY } },
-                    { type: 'text', style: { text: row[1], x: w1 + w2/2, y: yPos + rowHeight/2, fill: CONFIG.colors.textMain, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fw + ' ' + cellFont + 'px ' + FONT_FAMILY } },
-                    { type: 'text', style: { text: row[2], x: w1 + w2 + w3/2, y: yPos + rowHeight/2, fill: CONFIG.colors.highlight, textAlign: 'center', textVerticalAlign: 'middle', font: fs + ' ' + fwMid + ' ' + cellBoldFont + 'px ' + FONT_FAMILY } }
-                );
-            }
-            return group;
-        },
-        data: DATA.map((_, i) => i)
-    }]
+                const defaultCode = `option = {
+  title: {
+    text: 'Referer of a Website',
+    subtext: 'Fake Data',
+    left: 'center'
+  },
+  tooltip: {
+    trigger: 'item'
+  },
+  legend: {
+    orient: 'vertical',
+    left: 'left'
+  },
+  series: [
+    {
+      name: 'Access From',
+      type: 'pie',
+      radius: '50%',
+      data: [
+        { value: 1048, name: 'Search Engine' },
+        { value: 735, name: 'Direct' },
+        { value: 580, name: 'Email' },
+        { value: 484, name: 'Union Ads' },
+        { value: 300, name: 'Video Ads' }
+      ],
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowOffsetX: 0,
+          shadowColor: 'rgba(0, 0, 0, 0.5)'
+        }
+      }
+    }
+  ]
 };`;
 
                 const codeArea = document.getElementById('code-area');
@@ -1620,7 +1573,11 @@ option = {
 
                 document.getElementById('run-btn').addEventListener('click', () => this.runCode());
                 document.getElementById('shot-btn').addEventListener('click', () => this.captureWithSelectedQuality());
-                document.getElementById('export-bg-nobg-zip-btn').addEventListener('click', () => this.exportBackgroundAndNoBackgroundZip());
+
+                const transparentToggle = document.getElementById('transparent-bg-toggle');
+                if (transparentToggle) {
+                    transparentToggle.addEventListener('change', () => this.runCode());
+                }
 
                 // 全局按钮涟漪反馈
                 document.addEventListener('click', (e) => {
@@ -1760,12 +1717,68 @@ option = {
                 if (sHVal) sHVal.innerText = String(h);
             },
 
-            runCode() {
+            // --- 单独提取出的 Option 处理与注入样式逻辑 ---
+            _processAndSetOption(option, code, optChartInstance = null) {
+                const targetChart = optChartInstance || this.chart;
+                if (!targetChart) return;
+
+                // 对 custom 系列的 renderItem 进行字体家族 / 字号缩放后处理包装
+                this._applyFontScaleToOption(option, code);
+                // 运行新代码时：若代码里带了 title.text，自动同步到侧栏「标题」输入框，方便修改
+                if (option.title && option.title.text != null && String(option.title.text).trim() !== '') {
+                    const titleInput = document.getElementById('title-text');
+                    if (titleInput) titleInput.value = String(option.title.text).trim();
+                }
+                // 通用标题：与视频导出一致，合并侧栏「标题设置」到 option.title（适用于任意 ECharts 代码）
+                if (!option.title) option.title = {};
+                const titleShowEl = document.getElementById('title-show');
+                const titleShow = titleShowEl && titleShowEl.checked;
+                option.title.show = titleShow;
+                if (titleShow) {
+                    const titleTextEl = document.getElementById('title-text');
+                    if (titleTextEl && titleTextEl.value) option.title.text = titleTextEl.value.trim();
+                    const titleSizeEl = document.getElementById('title-size');
+                    const titleSize = titleSizeEl ? parseInt(titleSizeEl.value, 10) : 48;
+                    if (!option.title.textStyle) option.title.textStyle = {};
+                    option.title.textStyle.fontSize = titleSize;
+                    const titleTopEl = document.getElementById('title-top');
+                    const titleTop = titleTopEl ? titleTopEl.value : '6';
+                    option.title.top = titleTop + '%';
+                    option.title.left = 'center';
+                }
+
+                // Make the canvas visually match the transparent background toggle
+                const transparentToggle = document.getElementById('transparent-bg-toggle');
+                const chartEl = document.getElementById('chart');
+                const chartContainerEl = document.getElementById('chart-container');
+                if (transparentToggle && transparentToggle.checked) {
+                    option.backgroundColor = 'transparent';
+                    if (chartEl) chartEl.style.background = 'transparent';
+                    if (chartContainerEl) chartContainerEl.style.background = 'transparent';
+                    if (chartContainerEl) chartContainerEl.style.boxShadow = 'none';
+                } else {
+                    if (!option.backgroundColor || option.backgroundColor === 'transparent') {
+                        option.backgroundColor = '#ffffff';
+                    }
+                    if (chartEl) chartEl.style.background = '#ffffff';
+                    if (chartContainerEl) chartContainerEl.style.background = '#ffffff';
+                    if (chartContainerEl) chartContainerEl.style.boxShadow = 'var(--shadow-heavy)';
+                }
+
+                targetChart.clear();
+                targetChart.setOption(option, { notMerge: true });
+                if (!optChartInstance) {
+                    this.setStatus('运行成功', 'success');
+                }
+            },
+
+            async runCode() {
                 const code = document.getElementById('code-area').value;
                 if (typeof localStorage !== 'undefined') localStorage.setItem('echarts_shared_code', code);
                 if (!this.chart) return;
 
                 this.updateFontState();
+                await window.checkAndLoadDependencies(code);
 
                 try {
                     // Inject font/canvas globals BEFORE user code so any code
@@ -1774,61 +1787,69 @@ option = {
                     const injected = `
                         window.__TABLE_FONT_WEIGHT = '${window.__TABLE_FONT_WEIGHT || 'normal'}';
                         window.__TABLE_FONT_STYLE = '${window.__TABLE_FONT_STYLE || 'normal'}';
-                        window.__TABLE_FONT_SCALE  = ${this.effectiveFontScale || 1};
+                        window.__TABLE_FONT_SCALE = ${this.effectiveFontScale || 1};
                         window.__TABLE_FONT_FAMILY = '${(this.fontFamily || 'sans-serif').replace(/'/g, "\\'")}';
-                        window.__TABLE_CANVAS_WIDTH  = ${this.state.width};
+                        window.__TABLE_CANVAS_WIDTH = ${this.state.width};
                         window.__TABLE_CANVAS_HEIGHT = ${this.state.height};
                         window.__TABLE_BACKGROUND_ONLY = false;
                         window.__TABLE_NO_COLOR_BLOCKS = false;
                     `;
-                    const func = new Function('echarts', `
+
+                    let option;
+
+                    const mockedChart = {
+                        setOption: (opt) => {
+                            option = opt;
+                            this._processAndSetOption(option, code);
+                        },
+                        showLoading: () => { },
+                        hideLoading: () => { },
+                        resize: () => { },
+                        dispose: () => { },
+                        clear: () => { },
+                        on: () => { },
+                        off: () => { },
+                        getOption: () => option,
+                        getWidth: () => this.chart ? this.chart.getWidth() : 0,
+                        getHeight: () => this.chart ? this.chart.getHeight() : 0,
+                    };
+
+                    const ROOT_PATH = 'https://echarts.apache.org/examples';
+                    const app = { configParameters: {} };
+
+                    const func = new Function('myChart', '$', 'ROOT_PATH', 'app', 'echarts', `
                         var option;
-                        ${injected}
-                        ${code}
+                        try {
+                            ${injected}
+                            ${code}
+                        } catch(e) {}
                         return option;
                     `);
-                    let option = func(echarts);
-                    if (!option || typeof option !== 'object') {
-                        this.setStatus('运行失败：未返回有效的 option 对象', 'error');
-                        return;
+                    let returnedOption = func(mockedChart, typeof $ !== 'undefined' ? $ : null, ROOT_PATH, app, echarts);
+
+                    if (returnedOption && typeof returnedOption === 'object') {
+                        option = returnedOption;
+                        this._processAndSetOption(option, code);
+                    } else if (option) {
+                        // setOption intercepted it
+                    } else {
+                        // wait for async setOption
                     }
-                    // 对 custom 系列的 renderItem 进行字体家族 / 字号缩放后处理包装
-                    this._applyFontScaleToOption(option, code);
-                    // 运行新代码时：若代码里带了 title.text，自动同步到侧栏「标题」输入框，方便修改
-                    if (option.title && option.title.text != null && String(option.title.text).trim() !== '') {
-                        const titleInput = document.getElementById('title-text');
-                        if (titleInput) titleInput.value = String(option.title.text).trim();
-                    }
-                    // 通用标题：与视频导出一致，合并侧栏「标题设置」到 option.title（适用于任意 ECharts 代码）
-                    if (!option.title) option.title = {};
-                    const titleShowEl = document.getElementById('title-show');
-                    const titleShow = titleShowEl && titleShowEl.checked;
-                    option.title.show = titleShow;
-                    if (titleShow) {
-                        const titleTextEl = document.getElementById('title-text');
-                        if (titleTextEl && titleTextEl.value) option.title.text = titleTextEl.value.trim();
-                        const titleSizeEl = document.getElementById('title-size');
-                        const titleSize = titleSizeEl ? parseInt(titleSizeEl.value, 10) : 48;
-                        if (!option.title.textStyle) option.title.textStyle = {};
-                        option.title.textStyle.fontSize = titleSize;
-                        const titleTopEl = document.getElementById('title-top');
-                        const titleTop = titleTopEl ? titleTopEl.value : '6';
-                        option.title.top = titleTop + '%';
-                        option.title.left = 'center';
-                    }
-                    this.chart.clear();
-                    this.chart.setOption(option, { notMerge: true });
-                    this.setStatus('运行成功', 'success');
+
                 } catch (e) {
                     this.setStatus('运行失败：' + (e && e.message ? e.message : e), 'error');
                     console.error(e);
                 }
             },
-            // --- canvas control functions (zoom / pan / fit) ---
             initCanvasControl() {
                 const stage = document.getElementById('preview-stage');
                 if (!stage) return;
-                stage.addEventListener('wheel', (e) => { e.preventDefault(); const delta = e.deltaY > 0 ? -0.05 : 0.05; this.zoom(delta); }, { passive: false });
+                stage.addEventListener('wheel', (e) => {
+                    if (e.target.closest('#chart')) return; // 让鼠标在图表内部（如缩放条或地图区域）滚动时优先 ECharts 处理
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                    this.zoom(delta);
+                }, { passive: false });
                 let isDragging = false, startX = 0, startY = 0, isSpacePressed = false;
                 window.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'TEXTAREA' && document.activeElement.tagName !== 'INPUT') { isSpacePressed = true; stage.style.cursor = 'grab'; document.getElementById('chart-container').style.pointerEvents = 'none'; } });
                 window.addEventListener('keyup', (e) => { if (e.code === 'Space') { isSpacePressed = false; stage.style.cursor = 'default'; document.getElementById('chart-container').style.pointerEvents = 'auto'; } });
@@ -1893,7 +1914,8 @@ option = {
             },
             // ─── Off-screen render helper: creates a hidden ECharts instance, ───
             // ─── runs user code with injected flags, captures a PNG, disposes. ───
-            _renderOffscreen(code, flags, bgColor, pixelRatio) {
+            async _renderOffscreen(code, flags, bgColor, pixelRatio) {
+                await window.checkAndLoadDependencies(code);
                 return new Promise((resolve, reject) => {
                     // Create a hidden container matching the main chart size
                     const w = this.state.width;
@@ -1912,43 +1934,50 @@ option = {
                             window.__TABLE_NO_COLOR_BLOCKS = ${!!flags.noColorBlocks};
                             window.__TABLE_FONT_WEIGHT = '${window.__TABLE_FONT_WEIGHT || 'normal'}';
                             window.__TABLE_FONT_STYLE = '${window.__TABLE_FONT_STYLE || 'normal'}';
-                            window.__TABLE_FONT_SCALE  = ${this.effectiveFontScale || 1};
+                            window.__TABLE_FONT_SCALE = ${this.effectiveFontScale || 1};
                             window.__TABLE_FONT_FAMILY = '${(this.fontFamily || 'sans-serif').replace(/'/g, "\\'")}';
                             window.__TABLE_CANVAS_WIDTH = ${this.state.width};
                             window.__TABLE_CANVAS_HEIGHT = ${this.state.height};
                         `;
-                        const func = new Function('echarts', `
-                            var option;
-                            ${injected}
-                            ${code}
-                            return option;
+                        let option;
+
+                        const mockedChart = {
+                            setOption: (opt) => { option = opt; },
+                            showLoading: () => { },
+                            hideLoading: () => { },
+                            resize: () => { },
+                            dispose: () => { },
+                            clear: () => { },
+                            on: () => { },
+                            off: () => { },
+                            getOption: () => option,
+                            getWidth: () => offChart ? offChart.getWidth() : 0,
+                            getHeight: () => offChart ? offChart.getHeight() : 0,
+                        };
+
+                        const ROOT_PATH = 'https://echarts.apache.org/examples';
+                        const app = { configParameters: {} };
+
+                        const func = new Function('myChart', '$', 'ROOT_PATH', 'app', 'echarts', `
+        var option;
+        try {
+                                ${injected}
+                                ${code}
+        } catch (e) { }
+        return option;
                         `);
-                        let option = func(echarts);
+
+                        let returnedOption = func(mockedChart, typeof $ !== 'undefined' ? $ : null, ROOT_PATH, app, echarts);
+                        if (returnedOption && typeof returnedOption === 'object') {
+                            option = returnedOption;
+                        }
+
                         if (!option || typeof option !== 'object') {
                             throw new Error('代码未返回有效的 option 对象');
                         }
 
-                        // Apply the same smart font scaling to exports
-                        this._applyFontScaleToOption(option, code);
-
-                        // Apply title settings from sidebar (same as runCode)
-                        if (!option.title) option.title = {};
-                        const titleShowEl = document.getElementById('title-show');
-                        const titleShow = titleShowEl && titleShowEl.checked;
-                        option.title.show = titleShow;
-                        if (titleShow) {
-                            const titleTextEl = document.getElementById('title-text');
-                            if (titleTextEl && titleTextEl.value) option.title.text = titleTextEl.value.trim();
-                            const titleSizeEl = document.getElementById('title-size');
-                            const titleSize = titleSizeEl ? parseInt(titleSizeEl.value, 10) : 48;
-                            if (!option.title.textStyle) option.title.textStyle = {};
-                            option.title.textStyle.fontSize = titleSize;
-                            const titleTopEl = document.getElementById('title-top');
-                            option.title.top = (titleTopEl ? titleTopEl.value : '6') + '%';
-                            option.title.left = 'center';
-                        }
-
-                        offChart.setOption(option, { notMerge: true });
+                        // Use extracted logic
+                        this._processAndSetOption(option, code, offChart);
 
                         // Wait for rendering, then capture
                         const capture = () => {
@@ -1993,121 +2022,7 @@ option = {
                 });
             },
 
-            async exportBackgroundAndNoBackgroundZip() {
-                const btn = document.getElementById('export-bg-nobg-zip-btn');
 
-                // Guard: check dependencies
-                if (!this.chart) { alert('图表尚未初始化，请先运行代码！'); return; }
-                if (typeof JSZip === 'undefined') { alert('JSZip 库未加载，请检查网络连接后刷新页面'); return; }
-                if (typeof saveAs === 'undefined') { alert('FileSaver 库未加载，请检查网络连接后刷新页面'); return; }
-
-                // Disable button
-                if (btn) { btn.disabled = true; btn.textContent = '⏳ 导出中...'; }
-
-                const qualityEl = document.getElementById('export-quality-preset');
-                const pixelRatio = Math.max(1, parseInt((qualityEl && qualityEl.value) || '2', 10) || 2);
-                const label = pixelRatio === 8 ? '8K' : '4K';
-                const name = this.getExportName();
-                const code = document.getElementById('code-area').value;
-
-                // Ensure state is fresh
-                this.updateFontState();
-
-                // Timer setup
-                const startTime = Date.now();
-                const fmtTime = (ms) => {
-                    const s = Math.round(ms / 1000);
-                    const m = Math.floor(s / 60);
-                    return String(m).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-                };
-
-                const elapsedEl = document.getElementById('export-elapsed');
-                const etaEl = document.getElementById('export-eta');
-                const pctEl = document.getElementById('export-progress-pct');
-                if (elapsedEl) elapsedEl.textContent = '00:00';
-                if (etaEl) etaEl.textContent = '--:--';
-                if (pctEl) pctEl.textContent = '0%';
-
-                const timer = setInterval(() => {
-                    const elapsed = Date.now() - startTime;
-                    if (elapsedEl) elapsedEl.textContent = fmtTime(elapsed);
-                    const barEl = document.getElementById('export-progress-bar');
-                    const curPct = barEl ? parseFloat(barEl.style.width) || 0 : 0;
-                    if (curPct > 3 && etaEl) {
-                        const totalEst = elapsed / (curPct / 100);
-                        const remaining = Math.max(0, totalEst - elapsed);
-                        etaEl.textContent = fmtTime(remaining);
-                    }
-                }, 1000);
-
-                const updateProg = (pct, text) => {
-                    this.updateExportProgress(pct, text);
-                    if (pctEl) pctEl.textContent = Math.round(pct) + '%';
-                };
-
-                // Get background color from current chart
-                const opt = this.chart.getOption();
-                let rawBg = opt && opt.backgroundColor;
-                let bgColor = (Array.isArray(rawBg) ? rawBg[0] : rawBg) || '#F8F8F8';
-                if (!bgColor || bgColor === 'transparent') bgColor = '#F8F8F8';
-
-                try {
-                    this.showExportProgress('📦 正在导出 ZIP...', 5, '准备中...');
-                    updateProg(5, '准备中...');
-                    await new Promise(r => setTimeout(r, 200));
-
-                    // ── Step 1: Background-only (色块，无文字) ──
-                    updateProg(10, '正在渲染「仅背景」(色块无文字)...');
-                    const bgBase64 = await this._renderOffscreen(
-                        code,
-                        { backgroundOnly: true, noColorBlocks: false },
-                        bgColor,
-                        pixelRatio
-                    );
-                    updateProg(45, '「仅背景」截图完成');
-
-                    // ── Step 2: Text-only (文字，透明背景) ──
-                    updateProg(50, '正在渲染「仅文字」(透明背景)...');
-                    const noBgBase64 = await this._renderOffscreen(
-                        code,
-                        { backgroundOnly: false, noColorBlocks: true },
-                        'transparent',
-                        pixelRatio
-                    );
-                    updateProg(80, '「仅文字」截图完成');
-
-                    // ── Step 3: Pack ZIP ──
-                    updateProg(85, '正在打包 ZIP...');
-                    const zip = new JSZip();
-                    const folder = zip.folder(name);
-                    folder.file('仅背景（色块无文字）.png', bgBase64, { base64: true });
-                    folder.file('仅文字（透明背景）.png', noBgBase64, { base64: true });
-
-                    const blob = await zip.generateAsync({ type: 'blob' });
-                    updateProg(100, '正在保存...');
-                    saveAs(blob, name + '_背景与文字.zip');
-
-                    // Success
-                    clearInterval(timer);
-                    const totalMs = Date.now() - startTime;
-                    if (elapsedEl) elapsedEl.textContent = fmtTime(totalMs);
-                    if (etaEl) etaEl.textContent = '完成 ✅';
-                    if (pctEl) pctEl.textContent = '100%';
-                    this.hideExportProgress(true);
-                    this.setStatus('✅ 已保存：' + name + '_背景与文字.zip（' + label + '，含2张图）', 'success');
-
-                } catch (e) {
-                    clearInterval(timer);
-                    this.hideExportProgress(false);
-                    const msg = e && e.message ? e.message : String(e);
-                    this.setStatus('❌ 导出失败：' + msg, 'error');
-                    console.error('[exportZip] 失败:', e);
-                } finally {
-                    window.__TABLE_BACKGROUND_ONLY = false;
-                    window.__TABLE_NO_COLOR_BLOCKS = false;
-                    if (btn) { btn.disabled = false; btn.textContent = '📦 导出「仅背景」+「无背景」ZIP'; }
-                }
-            },
             captureAtQuality(pixelRatio, label) {
                 if (!this.chart) return;
                 const self = this;
@@ -2119,7 +2034,12 @@ option = {
                             const opt = self.chart.getOption();
                             let bg = opt && opt.backgroundColor;
                             if (Array.isArray(bg)) bg = bg[0];
-                            if (!bg || bg === 'transparent') bg = '#ffffff';
+                            const transparentToggle = document.getElementById('transparent-bg-toggle');
+                            if (transparentToggle && transparentToggle.checked) {
+                                bg = 'transparent';
+                            } else if (!bg || bg === 'transparent') {
+                                bg = '#ffffff';
+                            }
                             const dataUrl = self.chart.getDataURL({
                                 type: 'png',
                                 pixelRatio: pixelRatio,

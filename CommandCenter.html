@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command Center - 三屏联动可视化工作台</title>
+
+    <!-- 本地依赖引入 -->
+    <script src="./libs/echarts.min.js"></script>
+    <script src="./libs/jquery.min.js"></script>
+    <script src="./libs/echarts-gl.min.js"></script>
+    <script src="./libs/bmap.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-bg: #222427;
+            --text-color: #e0e0e0;
+            --border-color: #333;
+            --highlight: #4e6eff;
+            --highlight-secondary: #f9dd42;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #666;
+        }
+
+        .container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        .column {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            height: 100%;
+        }
+
+        /* 全屏三栏架构 */
+        .col-left {
+            width: 30%;
+        }
+
+        .col-mid {
+            width: 35%;
+        }
+
+        .col-right {
+            width: 35%;
+            border-right: none;
+        }
+
+        .header {
+            padding: 12px 15px;
+            background: #111;
+            font-weight: bold;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            letter-spacing: 1px;
+            color: #fff;
+        }
+
+        /* ================= 左栏/中栏：快捷启动块极客风格 ================= */
+        .launch-pad {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #181a1c;
+            gap: 25px;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .geek-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 70%;
+            max-width: 280px;
+            height: 130px;
+            background: linear-gradient(145deg, #1f2225, #141618);
+            border: 1px solid #333;
+            border-radius: 16px;
+            color: var(--highlight);
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 10px 10px 20px #0e0f10, -10px -10px 20px #222528;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .geek-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.05), transparent);
+            transform: skewX(-25deg);
+        }
+
+        .geek-btn:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: var(--highlight);
+            color: #fff;
+            box-shadow: 0 15px 25px rgba(78, 110, 255, 0.2), inset 0 0 10px rgba(78, 110, 255, 0.1);
+        }
+
+        .geek-btn:hover::before {
+            animation: shine 0.75s;
+        }
+
+        .geek-btn.yellow {
+            color: var(--highlight-secondary);
+        }
+
+        .geek-btn.yellow:hover {
+            border-color: var(--highlight-secondary);
+            box-shadow: 0 15px 25px rgba(249, 221, 66, 0.15), inset 0 0 10px rgba(249, 221, 66, 0.1);
+        }
+
+        @keyframes shine {
+            100% {
+                left: 200%;
+            }
+        }
+
+        .geek-btn .icon {
+            font-size: 36px;
+            margin-bottom: 12px;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .geek-btn span {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: 2px;
+        }
+
+        .geek-btn .sub-text {
+            font-size: 12px;
+            color: #777;
+            margin-top: 8px;
+            font-weight: normal;
+            letter-spacing: 0;
+            transition: color 0.3s;
+        }
+
+        .geek-btn:hover .sub-text {
+            color: #aaa;
+        }
+
+        .btn {
+            background: var(--highlight);
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .data-dock {
+            height: 35%;
+            /* 根据版面调整配比 */
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+            background: var(--panel-bg);
+        }
+
+        textarea.dock-input {
+            flex: 1;
+            width: 100%;
+            background: var(--panel-bg);
+            color: var(--text-color);
+            border: none;
+            padding: 15px;
+            resize: none;
+            font-family: Consolas, monospace;
+            font-size: 13px;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        textarea.dock-input::placeholder {
+            color: #666;
+        }
+
+        /* ================= 右栏：本地渲染与胶片店 ================= */
+        #chart-container {
+            height: 45%;
+            width: 100%;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .code-area-wrap {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-bottom: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .code-area-wrap textarea {
+            flex: 1;
+            width: 100%;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 15px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 13px;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        .run-btn-wrap {
+            position: absolute;
+            bottom: 15px;
+            right: 15px;
+        }
+
+        .film-strip {
+            height: 140px;
+            display: flex;
+            align-items: center;
+            overflow-x: auto;
+            overflow-y: hidden;
+            background: #0a0a0a;
+            padding: 10px 15px;
+            gap: 12px;
+            flex-shrink: 0;
+            scroll-behavior: smooth;
+        }
+
+        .snapshot {
+            height: 100%;
+            aspect-ratio: 4/3;
+            background: var(--panel-bg);
+            border: 2px solid #333;
+            border-radius: 6px;
+            object-fit: cover;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        .snapshot:hover {
+            border-color: var(--highlight-secondary);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 8px 15px rgba(249, 221, 66, 0.3);
+        }
+
+        .empty-film-tip {
+            color: #555;
+            font-size: 12px;
+            margin: auto;
+            font-style: italic;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- 左栏：AI与数据母港 -->
+        <div class="column col-left">
+            <div class="header">
+                <span>🤖 AI与数据母港</span>
+            </div>
+
+            <!-- 替换Iframe：快捷启动块 -->
+            <div class="launch-pad">
+                <div class="geek-btn" onclick="openWindow('https://chat.deepseek.com/')">
+                    <div class="icon">🧠</div>
+                    <span>启动 DeepSeek</span>
+                    <div class="sub-text">独立弹窗 · AI 辅助编程</div>
+                </div>
+            </div>
+
+            <div class="data-dock">
+                <div class="header"
+                    style="background: #1a1a1a; font-size: 12px; padding: 8px 15px; border-top: 1px solid var(--border-color);">
+                    <span>📊 我的原始数据 (Data Dock)</span>
+                </div>
+                <textarea class="dock-input"
+                    placeholder="请在此常驻粘贴 Excel 或 CSV 数据...&#10;&#10;例如：&#10;日期, 销量, 利润&#10;周一, 120, 50&#10;周二, 200, 80"></textarea>
+            </div>
+        </div>
+
+        <!-- 中栏：官网图表靶场 -->
+        <div class="column col-mid">
+            <div class="header">
+                <span>🎯 官网图表靶场</span>
+                <span style="font-weight: normal; font-size: 12px; color: #888;">(快捷指令舱)</span>
+            </div>
+
+            <!-- 替换Iframe：快捷启动块 -->
+            <div class="launch-pad">
+                <div class="geek-btn yellow" onclick="openWindow('https://echarts.apache.org/examples/zh/index.html')">
+                    <div class="icon">📊</div>
+                    <span>打开 ECharts 靶场</span>
+                    <div class="sub-text">独立弹窗 · 浏览官方示例</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右栏：本地渲染与胶片店 -->
+        <div class="column col-right">
+            <div class="header">
+                <span>🎨 本地渲染</span>
+            </div>
+            <div id="chart-container"></div>
+
+            <div class="code-area-wrap">
+                <div class="header" style="background: #1a1a1a; font-size: 12px; padding: 8px 15px;">
+                    <span>💻 JS 代码编辑区</span>
+                    <span style="color: #6a8caf; font-weight: normal; font-size:12px;" id="radar-status">📡
+                        剪贴板雷达运行中...</span>
+                </div>
+                <textarea id="code-editor"
+                    placeholder="在此粘贴或编写含有 option = ... 的 ECharts 代码&#10;(切屏复制后可自动读取剪贴板实现无缝粘贴)"></textarea>
+                <div class="run-btn-wrap">
+                    <button class="btn" id="run-btn"
+                        style="background: var(--highlight-secondary); color: #111; font-weight: bold; border-radius: 4px; padding: 8px 25px;">
+                        ▶ 运行代码
+                    </button>
+                </div>
+            </div>
+
+            <div class="header" style="background: #111; font-size: 12px; padding: 8px 15px;">
+                <span>🎞️ 灵感胶片</span>
+                <span style="font-weight: normal; font-size: 11px; color: #777;">(点击历史快照回溯，最多保留20张)</span>
+            </div>
+            <div class="film-strip" id="film-strip">
+                <div class="empty-film-tip" id="empty-tip">暂无图表快照，成功运行后将自动追加</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ================== 1. 弹窗控制逻辑 ================== 
+        function openWindow(url) {
+            window.open(url, '_blank', 'width=1000,height=800,left=100,top=100');
+        }
+
+        // ================== 2. 初始化 ECharts 实例 ================== 
+        var chartDom = document.getElementById('chart-container');
+        // 初始化使用暗色主题作为底层支撑
+        var myChart = echarts.init(chartDom, 'dark', { renderer: 'canvas' });
+
+        var codeEditor = document.getElementById('code-editor');
+        var runBtn = document.getElementById('run-btn');
+        var filmStrip = document.getElementById('film-strip');
+        var emptyTip = document.getElementById('empty-tip');
+
+        var MAX_SNAPSHOTS = 20; // 胶片数量上限
+
+        // 窗口尺寸自适应
+        window.addEventListener('resize', function () {
+            myChart.resize();
+        });
+
+        // ================== 3. 剪贴板雷达 ================== 
+        var lastClipboardCode = "";
+        window.addEventListener('focus', function () {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+                navigator.clipboard.readText().then(function (text) {
+                    if (text && text.indexOf('option') > -1 && text.indexOf('=') > -1 && text !== lastClipboardCode) {
+                        lastClipboardCode = text;
+                        codeEditor.value = text;
+
+                        var radarStatus = document.getElementById('radar-status');
+                        radarStatus.innerHTML = "✨ 已捕获新代码！";
+                        radarStatus.style.color = "#4e6eff";
+                        setTimeout(() => {
+                            radarStatus.innerHTML = "📡 剪贴板雷达运行中...";
+                            radarStatus.style.color = "#6a8caf";
+                        }, 2000);
+
+                        // 剪贴板获取视为新代码运行，并非历史记录
+                        runCode(false);
+                    }
+                }).catch(function (err) {
+                    console.warn("剪贴板雷达未读取，可能暂无内容或未授权: ", err);
+                });
+            }
+        });
+
+        // ================== 4. 样式强制注入功能 ================== 
+        function processMarkPoint(obj) {
+            if (!obj || typeof obj !== 'object') return;
+
+            if (Array.isArray(obj)) {
+                for (var i = 0; i < obj.length; i++) {
+                    processMarkPoint(obj[i]);
+                }
+            } else {
+                for (var key in obj) {
+                    if (key === 'markPoint' && obj[key]) {
+                        var mp = obj[key];
+                        // ======= 核心规范：强制水滴形状 =======
+                        mp.symbol = 'pin';
+
+                        // ======= 核心规范：黑底、黄边 =======
+                        if (!mp.itemStyle) mp.itemStyle = {};
+                        mp.itemStyle.color = '#000000';
+                        mp.itemStyle.borderColor = '#f9dd42';
+                        mp.itemStyle.borderWidth = 2;
+
+                        // ======= 核心规范：白字 =======
+                        if (!mp.label) mp.label = {};
+                        mp.label.color = '#ffffff';
+                    } else if (typeof obj[key] === 'object') {
+                        processMarkPoint(obj[key]);
+                    }
+                }
+            }
+        }
+
+        // ================== 5. 核心代码运行与拦截层 ================== 
+        // 增加 isFromHistory 参数，用以切断无限加胶片的死循环
+        function runCode(isFromHistory) {
+            var rawCode = codeEditor.value;
+            if (!rawCode.trim()) return;
+
+            try {
+                // 模拟官网的执行环境参数
+                var option;
+                var ROOT_PATH = 'https://echarts.apache.org/examples';
+                var app = {};
+
+                // 动态执行代码块
+                var func = new Function('myChart', 'echarts', 'ROOT_PATH', 'app',
+                    'var option;\n' + rawCode + '\nreturn option;'
+                );
+                option = func(myChart, echarts, ROOT_PATH, app);
+
+                if (option && typeof option === 'object') {
+                    // ======= 核心规范1：强制设置暗色背景 =======
+                    option.backgroundColor = '#222427';
+
+                    // ======= 核心规范2：强制覆盖色彩方案，优先黄蓝组合 =======
+                    var primaryColors = ['#f9dd42', '#4e6eff'];
+                    var defaultSystemColors = ['#ff6b6b', '#4ecdc4', '#c7f464', '#ff9f43', '#ee5253'];
+
+                    if (option.color && Array.isArray(option.color)) {
+                        var filteredOld = option.color.filter(function (c) {
+                            return c !== '#f9dd42' && c !== '#4e6eff';
+                        });
+                        option.color = primaryColors.concat(filteredOld);
+                    } else {
+                        option.color = primaryColors.concat(defaultSystemColors);
+                    }
+
+                    // ======= 核心规范3：全局搜索并统一改造 markPoint =======
+                    if (option.series) {
+                        processMarkPoint(option.series);
+                    }
+
+                    // 渲染图表
+                    myChart.clear();
+                    myChart.setOption(option, true);
+
+                    // 【修复】仅仅处理"非回溯"的全新代码记录
+                    if (!isFromHistory) {
+                        setTimeout(function () {
+                            captureSnapshot(rawCode);
+                        }, 800);
+                    }
+                }
+            } catch (err) {
+                console.error("代码运行错误: ", err);
+                alert("🔴 代码执行发现错误，请检查控制台或语法：\n" + err.message);
+            }
+        }
+
+        // ================== 6. 快照生成与管理 ================== 
+        function captureSnapshot(codeStr) {
+            try {
+                if (emptyTip) {
+                    emptyTip.style.display = 'none';
+                }
+
+                var dataURL = myChart.getDataURL({
+                    type: 'png',
+                    pixelRatio: 1,
+                    backgroundColor: '#222427' // 保持背景纯净
+                });
+
+                var img = document.createElement('img');
+                img.src = dataURL;
+                img.className = 'snapshot';
+                img.title = "✨ 点击还原进入此时间节点的代码";
+
+                img.dataset.code = encodeURIComponent(codeStr);
+
+                // 【修复】每次点击胶片回放时，标记 isFromHistory 为 true 以切断死循环
+                img.onclick = function () {
+                    var restoredCode = decodeURIComponent(this.dataset.code);
+                    codeEditor.value = restoredCode;
+                    runCode(true); // 传入 isFromHistory = true 不再生成新快照
+                };
+
+                // 追加新快照到底部（前端）
+                if (filmStrip.firstChild && filmStrip.firstChild !== emptyTip) {
+                    filmStrip.insertBefore(img, filmStrip.firstChild);
+                } else {
+                    filmStrip.appendChild(img);
+                }
+
+                // 【修复】增加胶片数量限制
+                var snapshots = filmStrip.getElementsByClassName('snapshot');
+                if (snapshots.length > MAX_SNAPSHOTS) {
+                    // 超出时，移除最老的一张胶片 (因为是用 insertBefore 追加，所以最老的永远是最后一张)
+                    filmStrip.removeChild(snapshots[snapshots.length - 1]);
+                }
+
+            } catch (e) {
+                console.warn("📸 快照截取暂不可用: ", e);
+            }
+        }
+
+        // 绑定"运行代码"按钮点击事件，视为非历史数据
+        runBtn.addEventListener('click', function () {
+            runCode(false);
+        });
+
+        // ================= 初始化演示 ================= 
+        window.onload = function () {
+            var demoCode = `
+// 自动演示代码（可随时清空）
+option = {
+    title: { 
+        text: '母港初始化演示',
+        left: 'center',
+        textStyle: { color: '#ccc' }
+    },
+    tooltip: { trigger: 'axis' },
+    xAxis: {
+        type: 'category',
+        data: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+        axisLabel: { color: '#888' }
+    },
+    yAxis: {
+        type: 'value',
+        splitLine: { lineStyle: { color: '#333' } },
+        axisLabel: { color: '#888' }
+    },
+    series: [
+        {
+            name: '销量A',
+            type: 'bar',
+            barWidth: '40%',
+            data: [120, 200, 150, 80, 70, 110, 130],
+            markPoint: {
+                data: [
+                    { type: 'max', name: '最大值' },
+                    { type: 'min', name: '最小值' }
+                ]
+            }
+        },
+        {
+            name: '曲线B',
+            type: 'line',
+            smooth: true,
+            data: [100, 180, 140, 90, 60, 130, 150]
+        }
+    ]
+};`;
+            codeEditor.value = demoCode.trim();
+            runCode(false);
+        };
+    </script>
+</body>
+
+</html>

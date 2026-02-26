@@ -6,10 +6,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Studio V108 (Nuclear Animation Fix)</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script>
+        // 拦截百度地图的弹窗报错
+        const nativeAlert = window.alert;
+        window.alert = function (msg) {
+            if (typeof msg === 'string' && (msg.indexOf('APP被您禁用') > -1 || msg.indexOf('百度地图') > -1 || msg.indexOf('Baidu Map') > -1 || msg.indexOf('APP Mcode码校验失败') > -1)) {
+                console.warn('已静默拦截百度地图 API 报错弹窗:', msg);
+                return;
+            }
+            nativeAlert(msg);
+        };
+
+        window.loadScript = function (src) {
+            return new Promise((resolve, reject) => {
+                if (document.querySelector(`script[src="${src}"]`)) return resolve();
+                const script = document.createElement('script');
+                script.src = src;
+                script.defer = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        };
+
+        window.checkAndLoadDependencies = async function (code) {
+            const hasGL = code.includes('globe') || code.includes('bar3D') || code.includes('scatter3D') || code.includes('surface') || code.includes('gl');
+            const hasBMap = code.includes('bmap') || code.includes('BMap') || code.includes('百度地图');
+
+            if (hasBMap) {
+                await window.loadScript('https://api.map.baidu.com/api?v=3.0&ak=KOmVjPVUAey1G2E8zNhPiuQ6QiEmAwZu');
+                await window.loadScript('./libs/bmap.min.js');
+            }
+            if (hasGL) {
+                await window.loadScript('./libs/echarts-gl.min.js');
+            }
+        };
+    </script>
+
+    <script defer src="./libs/echarts.min.js"></script>
+    <script defer src="./libs/jszip.min.js"></script>
+    <script defer src="./libs/FileSaver.min.js"></script>
+    <script defer src="./libs/html2canvas.min.js"></script>
+    <script defer src="./libs/jquery.min.js"></script>
 
     <style>
         /* ═══════════════════════════════════════════════════════════
@@ -1551,6 +1589,10 @@
                 let isDragging = false, startX, startY, isSpacePressed = false;
 
                 stage.addEventListener('wheel', (e) => {
+                    // 如果鼠标在 chart 内部（或配置了特定组件内部），不要阻止默认行为，让 ECharts 内部进行缩放
+                    if (e.target.closest('#chart')) {
+                        return; // 让事件继续传递给 ECharts
+                    }
                     e.preventDefault();
                     const delta = e.deltaY > 0 ? -0.05 : 0.05;
                     this.zoom(delta);
@@ -1661,8 +1703,13 @@
             /** 根据 series 类型推断 tooltip.trigger：饼图/仪表盘等用 item，否则用 axis */
             inferTooltipTrigger(option) {
                 const series = option.series;
-                if (!series || !Array.isArray(series) || series.length === 0) return 'axis';
+                if (!series || !Array.isArray(series) || series.length === 0) return 'item'; // fall back to item if unsure
                 const types = series.map(s => (s && s.type) ? s.type : '');
+
+                // 3D/GL 插件图表统一使用 item 触发，避免 axisPointer 读取失败
+                const has3D = types.some(t => t.indexOf('3D') > -1 || ['surface', 'globe'].includes(t));
+                if (has3D) return 'item';
+
                 const needItem = ['pie', 'gauge', 'funnel', 'sankey', 'tree', 'treemap', 'sunburst', 'graph', 'lines', 'map'].some(t => types.includes(t));
                 if (needItem) return 'item';
                 const allScatter = types.every(t => t === 'scatter' || t === 'effectScatter');
@@ -1679,6 +1726,10 @@
             // --- V108: 核弹级递归注入 ---
             forceAnimation(obj, duration, easing) {
                 if (typeof obj !== 'object' || obj === null) return;
+
+                // 针对 3D 的特殊处理：跳过 3D 专属系列，防止过度注入导致内部报错
+                if (obj.type && typeof obj.type === 'string' && (obj.type.indexOf('3D') > -1 || obj.type === 'surface' || obj.type === 'globe')) return;
+
                 obj.animation = true;
                 obj.animationDuration = duration;
                 obj.animationDurationUpdate = duration;
@@ -1688,6 +1739,9 @@
                 }
                 // 递归注入 (击穿所有 series, graphic, dataset)
                 for (const key in obj) {
+                    // 保护 3D 独有节点
+                    if (['globe', 'grid3D', 'geo3D', 'mapbox3D', 'maptalks3D', 'viewControl', 'light', 'shading', 'postEffect', 'temporalSuperSampling', 'xAxis3D', 'yAxis3D', 'zAxis3D'].includes(key)) continue;
+
                     const val = obj[key];
                     if (val && typeof val === 'object' && !Array.isArray(val)) {
                         this.forceAnimation(val, duration, easing);
@@ -1697,25 +1751,105 @@
                 }
             },
 
-            runCode: function (isFullReset = false, slowFactor = 1) {
+            _handleCodeError(e, isRetry) {
+                console.error(e);
+                const codeEl = document.getElementById('code-area');
+                const code = codeEl ? (codeEl.value || '') : '';
+                const hasGL = code.includes('globe') || code.includes('bar3D') || code.includes('scatter3D') || code.includes('surface') || code.includes('gl');
+                const statusEl = document.getElementById('code-status');
+
+                // 强制延迟重试：针对 GL 可能的加载不完全
+                if (hasGL && !isRetry) {
+                    if (statusEl) {
+                        statusEl.textContent = '3D 组件初始化中... 延迟重试';
+                        statusEl.style.color = 'var(--text-color)';
+                    }
+                    this.chart.clear();
+                    setTimeout(() => {
+                        this.runCode(true, 1, true);
+                    }, 200);
+                    return;
+                }
+
+                if (statusEl) {
+                    statusEl.textContent = '运行失败: ' + (e && e.stack ? e.stack.split('\n').slice(0, 2).join(' ') : (e.message || String(e)));
+                    statusEl.style.color = 'var(--red)';
+                }
+            },
+
+            async runCode(isFullReset = false, slowFactor = 1, isRetry = false) {
                 const codeEl = document.getElementById('code-area');
                 if (!codeEl || !this.chart) return;
                 try {
                     const code = codeEl.value;
+                    await window.checkAndLoadDependencies(code);
                     if (typeof localStorage !== 'undefined') localStorage.setItem('echarts_shared_code', code);
                     if (!code || !code.trim()) return;
                     let option;
-                    const func = new Function(`
-                        var option; 
-                        ${code}
+                    let hasSetOption = false; // Flag to track if setOption was called
+
+                    // 1. Create a mocked myChart object to intercept setOption
+                    const mockedChart = {
+                        setOption: (opt) => {
+                            hasSetOption = true;
+                            option = opt; // Capture the option passed to setOption
+                            this._processAndSetOption(option, isFullReset, slowFactor, isRetry);
+                        },
+                        showLoading: () => console.log('Mocked showLoading'),
+                        hideLoading: () => console.log('Mocked hideLoading'),
+                        resize: () => { },
+                        dispose: () => { },
+                        clear: () => { },
+                        on: () => { },
+                        off: () => { },
+                        getOption: () => option,
+                        getWidth: () => this.chart ? this.chart.getWidth() : 0,
+                        getHeight: () => this.chart ? this.chart.getHeight() : 0,
+                    };
+
+                    // 2. Define globals commonly used in complex ECharts examples
+                    const ROOT_PATH = 'https://echarts.apache.org/examples';
+                    const app = { configParameters: {} };
+
+                    // 3. Construct the new Function context
+                    // We pass in the mocked chart, $, ROOT_PATH, app, and GLOBAL ECHARTS
+                    const func = new Function('myChart', '$', 'ROOT_PATH', 'app', 'echarts', `
+                        var option;
+                        try {
+                            ${code}
+                        } catch(e) {
+                            console.error("Error executing user code:", e);
+                            throw e;
+                        }
+                        
                         return option;
                     `);
-                    option = func();
-                    if (!option || typeof option !== 'object') {
-                        console.warn('runCode: option 未定义或非对象');
+
+                    const returnedOption = func(mockedChart, typeof $ !== 'undefined' ? $ : null, ROOT_PATH, app, echarts);
+
+                    if (returnedOption && typeof returnedOption === 'object') {
+                        option = returnedOption;
+                    }
+
+                    if (option && typeof option === 'object' && !hasSetOption) {
+                        this._processAndSetOption(option, isFullReset, slowFactor, isRetry);
+                    } else if (!hasSetOption) {
+                        // wait for async (e.g., $.get)
                         return;
                     }
 
+                } catch (e) {
+                    this._handleCodeError(e, isRetry);
+                }
+            },
+
+            _processAndSetOption: function (option, isFullReset, slowFactor, isRetry = false) {
+                if (!option || typeof option !== 'object') {
+                    console.warn('runCode: option 未定义或非对象');
+                    return;
+                }
+
+                try {
                     if (isFullReset) {
                         let autoName = "Chart_Export";
                         if (option.title && option.title.text) autoName = option.title.text;
@@ -1737,7 +1871,11 @@
                         // 普通模式，只覆盖顶层，允许用户代码内部自由发挥
                         option.animationDuration = realDur;
                         option.animationEasing = ease;
-                        if (option.series) option.series.forEach(s => { s.animationDuration = realDur; s.animationEasing = ease; });
+                        if (option.series) option.series.forEach(s => {
+                            if (s && s.type && typeof s.type === 'string' && (s.type.indexOf('3D') > -1 || s.type === 'surface' || s.type === 'globe')) return;
+                            s.animationDuration = realDur;
+                            s.animationEasing = ease;
+                        });
                     }
 
                     this.deepScale(option);
@@ -1779,18 +1917,18 @@
                         if (option.tooltip.axisPointer.show === undefined) option.tooltip.axisPointer.show = true;
                     }
 
+                    // 健壮性校验
+                    if (!option.series && !option.dataset && !option.graphic) {
+                        console.warn("提示：option 中没有 series/dataset/graphic，可能是不完整的数据");
+                    }
+
                     if (isFullReset) this.chart.clear();
                     this.chart.setOption(option, { notMerge: isFullReset });
 
                     const statusEl = document.getElementById('code-status');
-                    if (statusEl) { statusEl.textContent = ''; statusEl.style.color = ''; }
+                    if (statusEl) { statusEl.textContent = '运行成功'; statusEl.style.color = 'var(--green)'; }
                 } catch (e) {
-                    console.error(e);
-                    const statusEl = document.getElementById('code-status');
-                    if (statusEl) {
-                        statusEl.textContent = '运行失败: ' + (e && e.message ? e.message : String(e));
-                        statusEl.style.color = 'var(--red)';
-                    }
+                    this._handleCodeError(e, isRetry);
                 }
             },
 
@@ -1936,10 +2074,41 @@
             },
 
             // ── 解析用户 option 代码 ──
-            _parseUserOption() {
+            async _parseUserOption() {
                 const code = document.getElementById('code-area').value;
-                const fn = new Function('var option; ' + code + ' return option;');
-                return fn();
+                await window.checkAndLoadDependencies(code);
+                let option;
+
+                const mockedChart = {
+                    setOption: (opt) => { option = opt; },
+                    showLoading: () => { },
+                    hideLoading: () => { },
+                    resize: () => { },
+                    dispose: () => { },
+                    clear: () => { },
+                    on: () => { },
+                    off: () => { },
+                    getOption: () => option,
+                    getWidth: () => this.chart ? this.chart.getWidth() : 0,
+                    getHeight: () => this.chart ? this.chart.getHeight() : 0,
+                };
+
+                const ROOT_PATH = 'https://echarts.apache.org/examples';
+                const app = { configParameters: {} };
+
+                const fn = new Function('myChart', '$', 'ROOT_PATH', 'app', `
+                    var option; 
+                    try {
+                        ${code}
+                    } catch(e) {}
+                    return option;
+                `);
+
+                const returnedOption = fn(mockedChart, typeof $ !== 'undefined' ? $ : null, ROOT_PATH, app);
+                if (returnedOption && typeof returnedOption === 'object') {
+                    option = returnedOption;
+                }
+                return option;
             },
 
             // ── 对 option 施加与 runCode 相同的样式处理（不含动画相关） ──
@@ -1998,7 +2167,7 @@
 
                 try {
                     // ── Step 1: 渲染完整数据 → 读取 Y 轴范围 ──
-                    const fullOption = this._parseUserOption();
+                    const fullOption = await this._parseUserOption();
                     fullOption.animation = false;
                     this._applyOptionStyle(fullOption);
                     this.chart.setOption(fullOption, { notMerge: true });
@@ -2042,7 +2211,7 @@
                         const linearT = frame / totalFrames;
                         const t = easeFn(linearT);
 
-                        const opt = this._parseUserOption();
+                        const opt = await this._parseUserOption();
                         opt.animation = false;
                         this._applyOptionStyle(opt);
                         this._interpolateForExport(opt, t);
@@ -2078,7 +2247,7 @@
 
                         const pct = Math.round((frame / totalFrames) * 100);
                         document.getElementById('export-fill').style.width = pct + '%';
-                        document.getElementById('render-info').innerText = `${frame}/${totalFrames}`;
+                        document.getElementById('render-info').innerText = `${frame} / ${totalFrames}`;
                         document.getElementById('render-pct').innerText = pct + '%';
                     }
                 } catch (e) {
@@ -2143,8 +2312,11 @@
             },
             deepScale(obj) {
                 if (!obj || typeof obj !== 'object') return;
+                if (obj.type && typeof obj.type === 'string' && (obj.type.indexOf('3D') > -1 || obj.type === 'surface' || obj.type === 'globe')) return;
+
                 for (let key in obj) {
-                    if (key === 'tooltip' || key === 'title' || key === 'xAxis' || key === 'yAxis' || key === 'legend') continue;
+                    // 保护 3D 独有属性不被深度遍历破坏
+                    if (['tooltip', 'title', 'xAxis', 'yAxis', 'legend', 'globe', 'grid3D', 'geo3D', 'mapbox3D', 'maptalks3D', 'viewControl', 'light', 'shading', 'postEffect', 'temporalSuperSampling', 'xAxis3D', 'yAxis3D', 'zAxis3D'].includes(key)) continue;
                     if (key === 'fontSize' && typeof obj[key] === 'number') obj[key] = Math.round(obj[key] * this.state.fontScale);
                     else if (typeof obj[key] === 'object') this.deepScale(obj[key]);
                 }
